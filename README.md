@@ -11,6 +11,27 @@ Por último, con el fin de emisión de juicio fundamentado respecto del nivel de
 2.  Aplicar diferentes herramientas de Deep Learning a problemas de índole organizacional, mediante el uso de estrategias tecnológicas y técnicas de análisis basados en el procesamiento de datos, comunicando sus resultados de manera oral y escrita en español e inglés básico.
 3.  Aplicar los principios fundamentales del ciclo de vida de los datos para la detección de patrones en problemas reales mediante el desarrollo de textos escritos en lenguaje técnico.
 
+# Instrucciones
+Para instalar el entorno y las dependencias necesarias:
+
+1. Abre una terminal en la carpeta raíz del proyecto.
+2. Crea un entorno virtual de Python:
+   ```bash
+   python3 -m venv env
+   ```
+3. Activa el entorno virtual:
+   - En macOS/Linux:
+     ```bash
+     source env/bin/activate
+     ```
+   - En Windows:
+     ```bash
+     .\env\Scripts\activate
+     ```
+4. Instala las dependencias desde el archivo `requirements.txt`:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 # Contenidos
 
