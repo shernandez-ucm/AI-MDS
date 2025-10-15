@@ -368,3 +368,13 @@ MigrationBackup/
 
 # Mac-specific
 .DS_Store
+labs/data/cifar-10-batches-py/data_batch_1
+labs/data/cifar-10-batches-py/data_batch_2
+labs/data/cifar-10-batches-py/data_batch_3
+labs/data/cifar-10-batches-py/data_batch_4
+labs/data/cifar-10-batches-py/data_batch_5
+labs/data/cifar-10-batches-py/readme.html
+labs/data/cifar-10-batches-py/test_batch
+labs/data/cifar-10-python.tar.gz
+labs/messi5.jpg
+labs/sudoku.png
