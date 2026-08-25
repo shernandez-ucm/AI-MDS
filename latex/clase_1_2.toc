@@ -1,0 +1,7 @@
+\babel@toc {spanish}{}\relax 
+\beamer@sectionintoc {1}{¿Qué es un sistema experto?}{3}{0}{1}
+\beamer@sectionintoc {2}{Representar el conocimiento: lógica proposicional}{8}{0}{2}
+\beamer@sectionintoc {3}{Inferencia: el motor de reglas}{12}{0}{3}
+\beamer@sectionintoc {4}{Modelos gráficos probabilísticos}{18}{0}{4}
+\beamer@sectionintoc {5}{Historia, límites y legado}{31}{0}{5}
+\beamer@sectionintoc {6}{Cierre}{34}{0}{6}

@@ -1,0 +1,529 @@
+\documentclass[aspectratio=169, 10pt]{beamer}
+
+% ---------- Tema y colores ----------
+\usetheme{default}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{frametitle continuation}{}
+
+\definecolor{StanfordRed}{RGB}{140,21,21}
+\definecolor{StanfordGray}{RGB}{77,77,77}
+\definecolor{LightGray}{RGB}{240,240,240}
+\definecolor{AccentBlue}{RGB}{0,84,166}
+\definecolor{AccentGreen}{RGB}{0,130,100}
+\definecolor{UCMBlue}{RGB}{4, 171, 226}
+\definecolor{UCMNavy}{RGB}{20, 65, 134}
+
+% Alias de la paleta antigua: las figuras TikZ de esta clase siguen
+% usando mitblue/mitgray, que ahora apuntan a los colores UCM.
+\definecolor{mitblue}{RGB}{20, 65, 134}
+\definecolor{mitgray}{RGB}{169, 169, 169}
+
+\setbeamercolor{frametitle}{fg=white, bg=UCMBlue}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{author}{fg=white}
+\setbeamercolor{institute}{fg=white!80}
+\setbeamercolor{structure}{fg=UCMBlue}
+\setbeamercolor{block title}{bg=UCMBlue!15!white, fg=UCMBlue}
+\setbeamercolor{block body}{bg=LightGray}
+\setbeamercolor{block title alerted}{bg=StanfordRed!15!white, fg=StanfordRed}
+\setbeamercolor{block body alerted}{bg=LightGray}
+\setbeamercolor{block title example}{bg=AccentGreen!15!white, fg=AccentGreen}
+\setbeamercolor{block body example}{bg=LightGray}
+\setbeamercolor{alerted text}{fg=UCMBlue}
+\setbeamercolor{example text}{fg=UCMBlue}
+
+\setbeamerfont{frametitle}{series=\bfseries, size=\large}
+\setbeamerfont{title}{series=\bfseries, size=\LARGE}
+\setbeamerfont{block title}{series=\bfseries}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[provide=*,spanish]{babel}
+\usepackage{amsmath, amssymb, bm}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows, arrows.meta, shapes, shapes.geometric, positioning,
+	fit, calc, matrix, chains, mindmap, decorations.pathreplacing,
+	backgrounds, shadows, patterns}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usetikzlibrary{circuits.logic.US}
+
+% ---------- Estilos TikZ propios de esta clase ----------
+\tikzset{
+	neuron/.style={circle, draw, fill=blue!20, minimum size=1.7em, inner sep=0pt},
+	input/.style={neuron, fill=green!20},
+	output/.style={neuron, fill=red!20},
+	hidden/.style={neuron, fill=blue!20},
+	bias/.style={neuron, fill=orange!20},
+	line/.style={draw, -latex}
+}
+
+% ---------- Comandos útiles ----------
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\E}{\mathbb{E}}
+\providecommand{\Var}{\operatorname{Var}}
+\providecommand{\relu}{\operatorname{ReLU}}
+
+\newcommand{\formula}[1]{%
+	\begin{tcolorbox}[colback=UCMBlue!8, colframe=UCMBlue, arc=4pt,
+		boxsep=2pt, left=6pt, right=6pt, top=3pt, bottom=3pt]
+		#1
+	\end{tcolorbox}
+}
+
+% ---------- Portada ----------
+\title{\textbf{Redes Neuronales}}
+\subtitle{MLP, funciones de activaci\'on y regularizaci\'on}
+\author{Sergio Hern\'andez, PhD\\ shernandez@ucm.cl}
+\institute{
+	\begin{tikzpicture}[scale=0.42, every node/.style={transform shape}]
+		\foreach \i/\y in {1/0,2/1,3/2}{\node[circle,draw=white,fill=white!20,minimum size=4mm] (i\i) at (0,\y){};}
+		\foreach \i/\y in {1/-0.5,2/0.5,3/1.5,4/2.5}{\node[circle,draw=white,fill=white!35,minimum size=4mm] (h\i) at (2,\y){};}
+		\foreach \i/\y in {1/0.5,2/1.5}{\node[circle,draw=white,fill=white!50,minimum size=4mm] (o\i) at (4,\y){};}
+		\foreach \a in {1,2,3}\foreach \b in {1,2,3,4}{\draw[white,opacity=0.5] (i\a)--(h\b);}
+		\foreach \a in {1,2,3,4}\foreach \b in {1,2}{\draw[white,opacity=0.5] (h\a)--(o\b);}
+	\end{tikzpicture}
+	\\ \textbf{Mag\'ister en Data Science --- Universidad Cat\'olica del Maule}}
+\date{}
+
+
+\begin{document}
+% --- Título ---
+{
+	\setbeamertemplate{background}{
+		\begin{tikzpicture}[remember picture, overlay]
+			\fill[UCMBlue] (current page.south west) rectangle (current page.north east);
+			\fill[UCMBlue!70!black, opacity=0.5]
+			(current page.south west) -- ++(0,3) -- ++(18,0) -- cycle;
+			\foreach \i in {1,...,40}{
+				\fill[white, opacity=0.04]
+				({random()*17}, {random()*10}) circle ({random()*0.3});
+			}
+		\end{tikzpicture}
+	}
+	\begin{frame}[plain]
+		\vspace{1.2cm}
+		\titlepage
+		\begin{tikzpicture}[remember picture, overlay]
+			\node[white, opacity=0.15, font=\fontsize{80}{80}\selectfont]
+			at (current page.east) [xshift=-2cm] {$\varphi$};
+		\end{tikzpicture}
+	\end{frame}
+}
+
+\section{Introducci\'on}
+\begin{frame}{De Modelos Lineales a No Lineales}
+  \begin{block}{Limitaciones de los Modelos Lineales}
+    Los modelos lineales, como la regresión logística o la regresión lineal, son potentes pero tienen una limitación fundamental: solo pueden aprender relaciones lineales entre las características de entrada y la salida.
+  \end{block}
+  
+  \begin{alertblock}{El problema XOR}
+    Un ejemplo clásico es el problema de la compuerta XOR. No es posible trazar una única línea recta para separar las clases.
+  \end{alertblock}
+  
+  \begin{figure}
+  \begin{tikzpicture}[scale=1.2]
+   % \fill[blue!40] (0,1) -- (1,1) -- (1,0) -- cycle;
+    \fill[red!5] (0,0) -- (1,0) -- (1,1) -- cycle;
+    \node[circle,fill=blue,inner sep=2pt] at (0,1) {};
+    \node at (0,1.3) {1};
+    \node[circle,fill=blue,inner sep=2pt] at (1,0) {};
+    \node at (1,-0.3) {1};
+    \node[circle,fill=red,inner sep=2pt] at (0,0) {};
+    \node at (0,-0.3) {0};
+    \node[circle,fill=red,inner sep=2pt] at (1,1) {};
+    \node at (1,1.3) {0};
+  \end{tikzpicture}
+ % \caption{La función XOR no es linealmente separable.}
+  \end{figure}
+  
+\end{frame}
+
+%------------------------------------------------
+\section{El Perceptrón Multicapa (MLP)}
+%------------------------------------------------
+
+\begin{frame}{Perceptrón Multicapa}
+    La solución es apilar múltiples capas de neuronas completamente conectadas. A esta arquitectura se le llama comúnmente \textbf{Perceptrón Multicapa} (MLP).
+
+%  \begin{itemize}
+%    \item \textbf{Capa de Entrada (Input Layer):} Recibe los datos iniciales.
+%    \item \textbf{Capas Ocultas (Hidden Layers):} Una o más capas que se encuentran entre la entrada y la salida. Son la clave para aprender representaciones complejas.
+%    \item \textbf{Capa de Salida (Output Layer):} Produce el resultado final (e.g., una probabilidad de clase).
+%  \end{itemize}
+  
+  \begin{figure}
+    \begin{tikzpicture}[
+      neuron/.style={circle, fill=blue!20, minimum size=4pt},
+      input/.style={circle, fill=green!20, minimum size=4pt},
+      output/.style={circle, fill=red!20, minimum size=4pt},
+      scale=0.7,
+      font=\tiny,
+      ]
+      % Input Layer
+      \foreach \i in {1,...,4}
+        \node[input] (I-\i) at (0, -\i*1.5) {$x_\i$};
+      
+      % Hidden Layer
+      \foreach \j in {1,...,5}
+        \node[neuron] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+      
+      % Output Layer
+      \foreach \k in {1,...,3}
+        \node[output] (O-\k) at (8, -\k*1.5-0.5) {$o_\k$};
+      
+      % Connections
+      \foreach \i in {1,...,4}
+        \foreach \j in {1,...,5}
+          \draw[->] (I-\i) -- (H-\j);
+          
+      \foreach \j in {1,...,5}
+        \foreach \k in {1,...,3}
+          \draw[->] (H-\j) -- (O-\k);
+
+      \node[above=0.5cm of I-1] {Capa de Entrada};
+      \node[above=0.5cm of H-1] {Capa Oculta $W^{(1)},b^{(1)}$};
+      \node[above=0.5cm of O-1] {Capa de Salida $W^{(2)},b^{(2)}$};
+    \end{tikzpicture}
+    %\caption{Ejemplo de un MLP con 4 entradas, 5 neuronas en la capa oculta y 3 salidas.}
+  \end{figure}
+\end{frame}
+
+%------------------------------------------------
+\section{Funciones de Activación}
+%------------------------------------------------
+
+\begin{frame}{Funciones de Activación}
+  Si solo apiláramos transformaciones lineales (afines), la red completa seguiría siendo un modelo lineal.
+  
+  \begin{block}{No Linealidad}
+    Para aprovechar el potencial de las arquitecturas multicapa, necesitamos incorporar una \textbf{función de activación no lineal} ($\sigma$) que se aplica a la salida de cada neurona en las capas ocultas. 
+  \end{block}
+  
+  \begin{itemize}
+    \item La salida de una neurona en la capa oculta incorpora una función de activación no-lineal. 
+    \begin{align*}
+    \begin{split}\begin{aligned}
+    \mathbf{h} & =\sigma(  \mathbf{W}^{(1)}\mathbf{x} + \mathbf{b}^{(1)}), \\
+    \mathbf{o} & =\sigma( \mathbf{W}^{(2)}\mathbf{h} + \mathbf{b}^{(2)}).
+\end{aligned}\end{split}
+    \end{align*}
+    
+    \item Introduce no linealidades que permiten a la red aprender relaciones complejas como la de la compuerta XOR.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Funciones de Activación Comunes}
+  \begin{columns}[T]
+    \begin{column}{.33\textwidth}
+      \textbf{ReLU} (Rectified Linear Unit)
+      \begin{figure}
+        \begin{tikzpicture}[scale=0.6]
+          \draw[->] (-2,0) -- (2,0) node[right] {$x$};
+          \draw[->] (0,-0.5) -- (0,2) node[above] {$\sigma(x)$};
+          \draw[thick, color=blue] (-2,0) -- (0,0) -- (2,2);
+        \end{tikzpicture}
+      \end{figure}
+      \[ \text{ReLU}(x) = \max(x, 0) \]
+    \end{column}
+    
+    \begin{column}{.33\textwidth}
+      \textbf{Sigmoide}
+      \begin{figure}
+        \begin{tikzpicture}[scale=0.6]
+          \draw[->] (-3,0) -- (3,0) node[right] {$x$};
+          \draw[->] (0,0) -- (0,1.2) node[above] {$\sigma(x)$};
+          \draw[thick, color=blue, domain=-3:3, samples=100] plot (\x, {1/(1+exp(-\x))});
+        \end{tikzpicture}
+      \end{figure}
+      \[ \text{sigmoid}(x) = \frac{1}{1 + e^{-x}} \]
+    \end{column}
+    
+    \begin{column}{.33\textwidth}
+      \textbf{Tanh} (Tangente Hiperbólica)
+      \begin{figure}
+        \begin{tikzpicture}[scale=0.5]
+          \draw[->] (-3,0) -- (3,0) node[right] {$x$};
+          \draw[->] (0,-1.2) -- (0,1.2) node[above] {$\sigma(x)$};
+          \draw[thick, color=blue, domain=-3:3, samples=100] plot (\x, {tanh(\x)});
+        \end{tikzpicture}
+      \end{figure}
+      \[ \tanh(x) = \frac{e^x - e^{-x}}{e^x + e^{-x}} \]
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Backpropagation}
+  \begin{block}{Retropopagación del error}
+    El objetivo del entrenamiento es encontrar los valores de los parámetros $\theta=\{\mathbf{W}^i,\mathbf{b}^i\}\vert_{i=1}^d$  que minimicen una \textbf{función de pérdida}  $\mathcal L( y,\hat y).$.
+  \end{block}
+ 
+   \begin{enumerate}
+    \item \textbf{Propagación hacia adelante (Forward Pass):} Se introduce un lote de datos en la red y se calcula la salida y el error (pérdida).
+    \item \textbf{Propagación hacia atrás (Backward Pass):} Se calcula el gradiente de la función de pérdida con respecto a cada parámetro (pesos $\mathbf{W}^i$ y sesgos $\mathbf{b}^i$) de la red, comenzando desde la capa de salida y avanzando hacia atrás.
+    \item \textbf{Actualización de parámetros:} 
+      \[ \theta \leftarrow \theta - \eta \nabla_\theta \mathcal L \]
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Backpropagation}
+  \begin{columns}[T]
+    \begin{column}{.5\textwidth}
+    \begin{figure}
+    \begin{tikzpicture}[
+      neuron/.style={circle, fill=blue!20, minimum size=4pt},
+      input/.style={circle, fill=green!20, minimum size=4pt},
+      output/.style={circle, fill=red!20, minimum size=4pt},
+      scale=0.5,
+      font=\tiny,
+      ]
+      % Input Layer
+      \foreach \i in {1,...,4}
+        \node[input] (I-\i) at (0, -\i*1.5) {$x_\i$};
+      
+      % Hidden Layer
+      \foreach \j in {1,...,5}
+        \node[neuron] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+      
+      % Output Layer
+      \foreach \k in {1,...,3}
+        \node[output] (O-\k) at (8, -\k*1.5-0.5) {$o_\k$};
+      
+      % Connections
+      \foreach \i in {1,...,4}
+        \foreach \j in {1,...,5}
+          \draw[->] (I-\i) -- (H-\j);
+          
+      \foreach \j in {1,...,5}
+        \foreach \k in {1,...,3}
+          \draw[->] (H-\j) -- (O-\k);
+    \end{tikzpicture}
+    %\caption{Ejemplo de un MLP con 4 entradas, 5 neuronas en la capa oculta y 3 salidas.}
+  \end{figure}
+     \end{column}
+         \begin{column}{.5\textwidth}
+         \begin{align*}
+         	z&=W^{(1)}x+b_1\\
+         	h&=\sigma(z)\\
+         	a&=W^{(2)}h+b_2\\
+         	\mathbf{o}&=\sigma(a)\\
+         	L&=\sum_i \mathcal{L}(y_i,\mathbf{o}_i)
+%  \frac{\partial \mathcal L}{\partial \mathbf{W^2}}
+%&= \sum_{j=1}^3 \frac{\partial \mathcal L}{\partial o_j} \frac{\partial o_j}{\partial \mathbf{W^2}} \\
+%  \frac{\partial \mathcal L}{\partial \mathbf{W^1}}
+%&= \sum_{j=1}^3 \frac{\partial \mathcal L}{\partial o_j} \frac{\partial o_j}{\partial \mathbf{W^2}} 
+  \end{align*}
+
+     \end{column}
+    \end{columns}
+ 
+  \end{frame}
+  
+  \begin{frame}{Backpropagation}
+  	\begin{columns}[T]
+  		\begin{column}{.5\textwidth}
+  			\begin{figure}
+  				\begin{tikzpicture}[
+  					neuron/.style={circle, fill=blue!20, minimum size=4pt},
+  					input/.style={circle, fill=green!20, minimum size=4pt},
+  					output/.style={circle, fill=red!20, minimum size=4pt},
+  					scale=0.5,
+  					font=\tiny,
+  					]
+  					% Input Layer
+  					\foreach \i in {1,...,4}
+  					\node[input] (I-\i) at (0, -\i*1.5) {$x_\i$};
+  					
+  					% Hidden Layer
+  					\foreach \j in {1,...,5}
+  					\node[neuron] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+  					
+  					% Output Layer
+  					\foreach \k in {1,...,3}
+  					\node[output] (O-\k) at (8, -\k*1.5-0.5) {$o_\k$};
+  					
+  					% Connections
+  					\foreach \i in {1,...,4}
+  					\foreach \j in {1,...,5}
+  					\draw[->] (I-\i) -- (H-\j);
+  					
+  					\foreach \j in {1,...,5}
+  					\foreach \k in {1,...,3}
+  					\draw[->] (H-\j) -- (O-\k);
+  				\end{tikzpicture}
+  				%\caption{Ejemplo de un MLP con 4 entradas, 5 neuronas en la capa oculta y 3 salidas.}
+  			\end{figure}
+  		\end{column}
+  		\begin{column}{.5\textwidth}
+  			\begin{align*}
+  			&\delta^{(2)}=\frac{\partial L}{\partial a}=\frac{\partial L}{\partial o} \odot \sigma'(a)\\
+  			&\frac{\partial L}{\partial W^{(2)}}=\delta^{(2)} \mathbf{h}^T\\
+  			&\delta^{(1)}=(\partial W^{(2)} \delta^{(2)}) \odot \sigma'(z)\\
+  			&\frac{\partial L}{\partial W^{(1)}}=\delta^{(1)} \mathbf{x}^T
+  				%  \frac{\partial \mathcal L}{\partial \mathbf{W^2}}
+  				%&= \sum_{j=1}^3 \frac{\partial \mathcal L}{\partial o_j} \frac{\partial o_j}{\partial \mathbf{W^2}} \\
+  				%  \frac{\partial \mathcal L}{\partial \mathbf{W^1}}
+  				%&= \sum_{j=1}^3 \frac{\partial \mathcal L}{\partial o_j} \frac{\partial o_j}{\partial \mathbf{W^2}} 
+  			\end{align*}
+  			
+  		\end{column}
+  	\end{columns}
+  	
+  \end{frame}
+%------------------------------------------------
+\section{Regularización y Problemas Comunes}
+%------------------------------------------------
+
+\begin{frame}{Sobreajuste (Overfitting)}  
+  \begin{block}{Sobreajuste}
+  Las redes neuronales, al tener una gran capacidad (muchos parámetros), corren el riesgo de \textbf{sobreajuste}.  Ocurre cuando el modelo aprende "demasiado bien" los datos de entrenamiento, incluyendo el ruido, y pierde la capacidad de generalizar a datos nuevos no vistos. 
+  \end{block}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      El sobreajuste ocurre cuando una red se apoya excesivamente en un conjunto pequeño de neuronas o características para hacer sus predicciones. Esto la hace vulnerable a pequeñas variaciones en los datos de entrada.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{figure}
+        \includegraphics[width=\textwidth]{figures/capacity-vs-error} % Reemplazar con un gráfico de error de entrenamiento vs. validación
+      %  \caption{El error de entrenamiento disminuye, pero el de validación aumenta.}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Técnica de Regularización: Dropout}
+  \textbf{Dropout} es una técnica de regularización simple y efectiva introducida para combatir el sobreajuste. 
+  
+  \begin{block}{Dropout}
+    Durante el entrenamiento, en cada paso, se "apagan" (ponen a cero) aleatoriamente un subconjunto de neuronas. Esto obliga a la red a no depender de ninguna neurona individual y a aprender características más redundantes y robustas. 
+  \end{block}
+  
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \begin{tikzpicture}[
+	neuron/.style={circle, fill=blue!20, minimum size=4pt},
+  	input/.style={circle, fill=green!20, minimum size=4pt},
+  	output/.style={circle, fill=red!20, minimum size=4pt},
+  	scale=0.5,
+  	font=\tiny,
+      ]
+      \foreach \i in {1,...,4}
+       \node[input] (I-\i) at (0, -\i*1.2) {$x_\i$};
+        \foreach \j in {1,...,5}
+  	\node[neuron] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+        \foreach \i in {1,...,4} \foreach \j in {1,...,5} \draw (I-\i) -- (H-\j);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \begin{tikzpicture}[
+      	neuron/.style={circle, fill=blue!20, minimum size=4pt},
+  	input/.style={circle, fill=green!20, minimum size=4pt},
+  	output/.style={circle, fill=red!20, minimum size=4pt},
+	off/.style={circle, fill=gray!30, minimum size=4pt, text=gray},
+  	scale=0.5,
+  	font=\tiny,
+      ]
+       \foreach \i in {1,3,4}
+       \node[input] (I-\i) at (0, -\i*1.2) {$x_\i$};
+       \foreach \i in {2}
+       \node[off] (I-\i) at (0, -\i*1.2) {$x_\i$};
+        \foreach \j in {1,3,5}
+  	\node[neuron] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+         \foreach \j in {2,4}
+  	\node[off] (H-\j) at (4, -\j*1.5+0.75) {$h_\j$};
+
+        \foreach \i in {1,3,4} \foreach \j in {1,3,5} \draw (I-\i) -- (H-\j);
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[shrink]{Dropout en la Práctica}
+  \begin{block}{Mecanismo}
+    Para una capa oculta $\mathbf{h}$, aplicamos dropout de la siguiente manera:
+    \begin{enumerate}
+      \item Se define una \textbf{probabilidad de abandono} $p$ (e.g., $p=0.5$). 
+      \item Durante el entrenamiento, cada neurona $h_i$ se pone a cero con probabilidad $p$.
+      \item Las activaciones de las neuronas restantes se escalan por un factor de $1/(1-p)$.
+    \end{enumerate}
+    \[ h'_i = \begin{cases} 0 & \text{con probabilidad } p \\ \frac{h_i}{1-p} & \text{con probabilidad } 1-p \end{cases} \]
+  \end{block}
+  \pause
+  \begin{alertblock}{¿Por qué escalar por $1/(1-p)$?}
+    Esta técnica se llama \textbf{Abandono Invertido (Inverted Dropout)}. El escalado asegura que el valor esperado de la salida de la capa se mantenga igual durante el entrenamiento y la prueba.
+    \[ E[h'_i] = p \cdot 0 + (1-p) \cdot \frac{h_i}{1-p} = h_i \]
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{Entrenamiento vs. Inferencia}
+  El comportamiento de una capa con Dropout es fundamentalmente diferente en cada fase.
+  
+  \begin{block}{Durante el Entrenamiento (Training)}
+    \begin{itemize}
+      \item Dropout está \textbf{activo}.
+      \item En cada iteración de propagación hacia adelante, se genera una máscara de abandono diferente y se aplica a las neuronas.
+      \item Esto introduce ruido y regulariza el modelo, forzándolo a generalizar. 
+    \end{itemize}
+  \end{block}
+  \pause
+  \begin{block}{Durante la Inferencia (Test/Predicción)}
+    \begin{itemize}
+      \item Dropout está \textbf{desactivado}. 
+      \item Se utiliza toda la red (todas las neuronas están activas) para hacer la predicción.
+      \item Esto equivale a promediar las predicciones de la exponencial cantidad de sub-redes generadas durante el entrenamiento. 
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Estabilidad Numérica}
+  Entrenar redes profundas puede ser difícil debido a problemas de estabilidad numérica.
+  \begin{align}
+  \partial_{\mathbf{W}^{(l)}} \mathbf{o} = \underbrace{\partial_{\mathbf{h}^{(L-1)}} \mathbf{h}^{(L)}}_{ \mathbf{M}^{(L)} \stackrel{\textrm{def}}{=}} \cdots \underbrace{\partial_{\mathbf{h}^{(l)}} \mathbf{h}^{(l+1)}}_{ \mathbf{M}^{(l+1)} \stackrel{\textrm{def}}{=}} \underbrace{\partial_{\mathbf{W}^{(l)}} \mathbf{h}^{(l)}}_{ \mathbf{v}^{(l)} \stackrel{\textrm{def}}{=}}.
+  \end{align}
+  
+  \begin{alertblock}{Desvanecimiento de Gradientes (Vanishing Gradients)}
+    A medida que los gradientes se propagan hacia atrás, pueden volverse extremadamente pequeños, haciendo que las primeras capas de la red aprendan muy lentamente o dejen de aprender. Es común con funciones como la sigmoide.
+  \end{alertblock}
+  
+  \begin{alertblock}{Explosión de Gradientes (Exploding Gradients)}
+    Lo contrario: los gradientes se vuelven enormes, provocando actualizaciones muy grandes en los pesos y haciendo que el entrenamiento sea inestable.
+  \end{alertblock}
+  
+%  \textbf{Soluciones comunes:}
+%  \begin{itemize}
+%    \item Una cuidadosa \textbf{inicialización de parámetros} (e.g., Xavier, He).
+%    \item Uso de funciones de activación como ReLU, que mitigan el desvanecimiento.
+%    \item Normalización por lotes (Batch Normalization).
+%    \item Recorte de gradientes (Gradient Clipping).
+%  \end{itemize}
+\end{frame}
+
+
+%------------------------------------------------
+\section{Resumen}
+%------------------------------------------------
+
+\begin{frame}{Resumen y Conclusiones}
+  \begin{itemize}
+    \item El Perceptrón Multicapa (MLP) supera las limitaciones de los modelos lineales al introducir \textbf{capas ocultas} y \textbf{funciones de activación no lineales}.
+    \item El entrenamiento se realiza mediante el algoritmo de \textbf{retropropagación}, ajustando los pesos para minimizar una función de pérdida.
+    \item El \textbf{sobreajuste} es un riesgo importante, y se combate con técnicas de regularización como \textbf{Dropout}. 
+    \item La \textbf{estabilidad numérica} (desvanecimiento/explosión de gradientes) es un desafío clave en el entrenamiento, abordado con una correcta inicialización de parámetros y arquitecturas adecuadas.
+  \end{itemize}
+\end{frame}
+
+
+\end{document}
