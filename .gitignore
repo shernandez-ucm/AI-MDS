@@ -6,8 +6,15 @@
 # virtual environment
 .env
 .venv
+.venv/
 venv/
+env/
 ENV/
+env.bak/
+venv.bak/
+pyvenv.cfg
+.conda/
+.python-version
 
 # ignore all pdf creation files
 package.json

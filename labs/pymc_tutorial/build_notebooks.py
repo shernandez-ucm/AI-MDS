@@ -1145,6 +1145,513 @@ print(f"\nCasos utiles: {n_rechazo} por rechazo (de 200.000 simulados)")
 print(f"              40.000 por MCMC (todos utilizables)")
 """)
 
+# ===========================================================================
+# 5. INFERENCIA CAUSAL — DESVINCULACION ESCOLAR
+# ===========================================================================
+md(r"""
+---
+# 5. Inferencia causal
+
+Hasta aquí todas las probabilidades venían del enunciado. En esta última
+sección los números salen de **datos reales**: el registro oficial de
+*desvinculación escolar* del Ministerio de Educación de Chile, 2010–2024.
+
+> **Fuente.** Centro de Estudios MINEDUC, *Tasa de incidencia de la
+> desvinculación del sistema escolar*, `data/OFICIAL-Tasa-Incidencia-Desvinculacion-2010-2024.xlsx`,
+> hoja «Tasas a nivel de Dependencia». La hoja apila tres tablas con el mismo
+> formato: total (Tabla 1), mujeres (Tabla 1.a) y hombres (Tabla 1.b).
+
+Un estudiante está **desvinculado** en el año $t$ si estaba matriculado en $t$
+y no aparece en la matrícula de $t+1$, sin haber egresado ni fallecido. La
+*tasa de incidencia* es esa cuenta dividida por la matrícula teórica.
+
+Trabajaremos con cuatro variables:
+
+| Variable | Valores |
+|---|---|
+| `Anio` | 2010 … 2024 (15 estados) |
+| `Sexo` | Mujer, Hombre |
+| `Dep` | Municipal, Particular subvencionado, Particular pagado, C. Adm. delegada, Servicio Local de Educación |
+| `D` | 1 = se desvincula, 0 = permanece |
+
+La pregunta que da nombre a la sección **no** es «¿qué tasa tienen los
+municipales?» — eso se lee en la tabla. Es:
+
+> ¿Cuál sería la tasa de desvinculación **si** el sistema completo pasara a una
+> dependencia dada?
+
+Es decir $P(D = 1 \mid do(\texttt{Dep} = d))$, no $P(D = 1 \mid \texttt{Dep} = d)$.
+Son distintas, y la sección trata de cuánto y por qué.
+""")
+
+code(r"""
+from pathlib import Path
+
+HOJA = "Tasas a nivel de Dependencia"
+DEPS = ["Municipal", "Particular subvencionado", "Particular pagado",
+        "C. Adm. delegada", "Servicio Local de educación"]
+SEXOS = ["Mujer", "Hombre"]
+ANIOS = list(range(2010, 2025))
+SIGLAS = {"Municipal": "MUN", "Particular subvencionado": "PSUB",
+          "Particular pagado": "PPAG", "C. Adm. delegada": "CAD",
+          "Servicio Local de educación": "SLEP"}
+
+
+def ruta_datos(nombre="OFICIAL-Tasa-Incidencia-Desvinculacion-2010-2024.xlsx"):
+    # El notebook vive en labs/pymc_tutorial/; el archivo en data/.
+    for base in [Path("."), Path(".."), Path("../.."), Path("../../..")]:
+        cand = base / "data" / nombre
+        if cand.exists():
+            return cand
+    raise FileNotFoundError(f"No se encontro data/{nombre}")
+
+
+def _fila_titulo(hoja, patron):
+    col = hoja.iloc[:, 0].astype(str)
+    return int(col[col.str.contains(patron, case=False, na=False)].index[0])
+
+
+def cargar_desvinculacion(ruta=None):
+    # Devuelve la tabla en formato largo: una fila por (sexo, dependencia, anio).
+    hoja = pd.read_excel(ruta or ruta_datos(), sheet_name=HOJA, header=None)
+    # Cada sub-tabla tiene 4 filas de encabezado antes de los datos, y por cada
+    # anio un bloque de 6 columnas: Global(desv, matricula, tasa) y luego lo
+    # mismo restringido al sistema regular. Nos quedamos con las columnas Global.
+    primera = {"Mujer":  _fila_titulo(hoja, r"^Tabla 1\.a") + 4,
+               "Hombre": _fila_titulo(hoja, r"^Tabla 1\.b") + 4}
+    filas = []
+    for sexo, base in primera.items():
+        for i, dep in enumerate(DEPS):
+            etiqueta = str(hoja.iat[base + i, 0]).split(" /")[0].strip()
+            assert etiqueta == dep, f"fila {base + i}: {etiqueta!r} != {dep!r}"
+            for j, anio in enumerate(ANIOS):
+                c = 1 + 6 * j
+                desv, matricula = hoja.iat[base + i, c], hoja.iat[base + i, c + 1]
+                if pd.isna(desv) or pd.isna(matricula):
+                    continue          # el SLEP no existe antes de 2018
+                filas.append({"sexo": sexo, "dep": dep, "anio": int(anio),
+                              "desvinculados": int(desv),
+                              "matricula": int(matricula)})
+    tabla = pd.DataFrame(filas)
+    tabla["tasa"] = tabla.desvinculados / tabla.matricula
+    return tabla
+
+
+datos = cargar_desvinculacion()
+print(f"{len(datos)} celdas   "
+      f"{datos.matricula.sum():,} matriculas   "
+      f"{datos.desvinculados.sum():,} desvinculaciones\n")
+print(datos.head(3).to_string(index=False))
+
+print("\nTasa por dependencia y anio (%):")
+print((100 * datos.pivot_table(index="anio", columns="dep",
+                               values="desvinculados", aggfunc="sum")
+       / datos.pivot_table(index="anio", columns="dep",
+                           values="matricula", aggfunc="sum")).round(2).to_string())
+""")
+
+md(r"""
+Dos hechos de esa tabla mandan sobre todo lo que sigue:
+
+1. **La tasa cambia mucho por año.** Baja de forma sostenida entre 2011 y 2018,
+   se desploma en 2020 (durante la pandemia casi no hubo desvinculación
+   registrada) y repunta después.
+2. **La composición del sistema también cambia.** La matrícula municipal cae de
+   1,25 millones a 0,70 millones, y desde 2018 aparece el **Servicio Local de
+   Educación** (SLEP), que absorbe parte de esa matrícula y llega a 395 mil en
+   2024.
+
+Es decir: el año afecta a la tasa **y** afecta a la dependencia. Ese es el
+patrón de una **causa común**, la estructura de la sección 2.
+""")
+
+code(r"""
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+pivote = (datos.pivot_table(index="anio", columns="dep", values="desvinculados",
+                            aggfunc="sum")
+          / datos.pivot_table(index="anio", columns="dep", values="matricula",
+                              aggfunc="sum"))
+for dep in DEPS:
+    axes[0].plot(pivote.index, 100 * pivote[dep], "o-", ms=3, label=dep)
+axes[0].set_title("Tasa de desvinculacion por dependencia")
+axes[0].set_xlabel("anio"); axes[0].set_ylabel("tasa (%)")
+axes[0].legend(fontsize=7); axes[0].grid(alpha=0.3)
+
+matricula = datos.pivot_table(index="anio", columns="dep", values="matricula",
+                              aggfunc="sum").fillna(0)
+axes[1].stackplot(matricula.index, *(matricula[d] / 1e6 for d in DEPS),
+                  labels=DEPS, alpha=0.85)
+axes[1].set_title("Composicion de la matricula")
+axes[1].set_xlabel("anio"); axes[1].set_ylabel("millones de estudiantes")
+axes[1].legend(fontsize=7, loc="lower left"); axes[1].grid(alpha=0.3)
+
+plt.tight_layout(); plt.show()
+""")
+
+md(r"""
+## 5.1 De la tabla al modelo generativo
+
+La tabla da directamente todas las probabilidades condicionales que necesitamos.
+Con la matrícula como conteo de la población:
+
+$$P(\texttt{Anio}=a) = \frac{M_{a}}{M}, \qquad
+P(\texttt{Sexo}=s \mid a) = \frac{M_{as}}{M_{a}}, \qquad
+P(\texttt{Dep}=d \mid a, s) = \frac{M_{asd}}{M_{as}}$$
+
+$$P(D = 1 \mid a, s, d) = \frac{\text{desvinculados}_{asd}}{M_{asd}}$$
+
+donde $M_{asd}$ es la matrícula de la celda. La última es la **tasa de
+incidencia** de la tabla: condicionar la desvinculación en sexo, dependencia y
+año es exactamente leer una celda.
+""")
+
+code(r"""
+nA, nS, nD = len(ANIOS), len(SEXOS), len(DEPS)
+idx_anio = {a: i for i, a in enumerate(ANIOS)}
+idx_sexo = {s: i for i, s in enumerate(SEXOS)}
+idx_dep = {d: i for i, d in enumerate(DEPS)}
+
+MATRICULA = np.zeros((nA, nS, nD))
+DESVINC = np.zeros((nA, nS, nD))
+for r in datos.itertuples():
+    MATRICULA[idx_anio[r.anio], idx_sexo[r.sexo], idx_dep[r.dep]] = r.matricula
+    DESVINC[idx_anio[r.anio], idx_sexo[r.sexo], idx_dep[r.dep]] = r.desvinculados
+
+# Celdas que existen. El SLEP tiene matricula 0 antes de 2018: no es una tasa
+# baja, es una tasa que no esta definida. Volveremos sobre esto en el Ej. 11.
+EXISTE = MATRICULA > 0
+
+TASA = np.divide(DESVINC, MATRICULA, out=np.zeros_like(MATRICULA), where=EXISTE)
+P_ANIO = MATRICULA.sum(axis=(1, 2)) / MATRICULA.sum()
+P_SEXO = MATRICULA.sum(axis=2) / MATRICULA.sum(axis=2).sum(axis=1, keepdims=True)
+P_DEP = MATRICULA / MATRICULA.sum(axis=2, keepdims=True)
+
+print(f"P(Anio) va de {P_ANIO.min():.4f} a {P_ANIO.max():.4f} (casi uniforme)")
+print(f"P(Mujer | anio) va de {P_SEXO[:, 0].min():.4f} a {P_SEXO[:, 0].max():.4f}")
+print(f"\nP(Dep | anio, Mujer) en 2010 y 2024:")
+for anio in (2010, 2024):
+    reparto = "  ".join(f"{SIGLAS[d]}={P_DEP[idx_anio[anio], 0, k]:.3f}"
+                        for k, d in enumerate(DEPS))
+    print(f"  {anio}: {reparto}")
+
+print(f"\nTasa 2024, mujeres municipales: {TASA[idx_anio[2024], 0, 0]:.4f}")
+print(f"Tasa 2024, hombres municipales: {TASA[idx_anio[2024], 1, 0]:.4f}")
+
+
+def muestrear_cat(modelo, n=200_000, semilla=SEMILLA):
+    # Igual que muestrear(), pero sin forzar booleanos: aqui Anio, Sexo y Dep
+    # tienen mas de dos estados.
+    with modelo:
+        previa = pm.sample_prior_predictive(draws=n, random_seed=semilla)
+    nombres = ([v.name for v in modelo.free_RVs]
+               + [d.name for d in modelo.deterministics])
+    return pd.DataFrame({v: previa.prior[v].values.reshape(-1) for v in nombres})
+""")
+
+md(r"""
+---
+## Ejercicio 9 — El modelo generativo
+
+Declare en PyMC el modelo que simula **un estudiante** del sistema escolar
+chileno 2010–2024:
+
+$$P(a, s, d, D) = P(a)\,P(s \mid a)\,P(d \mid a, s)\,P(D \mid a, s, d)$$
+
+Los cuatro tensores del paso anterior son exactamente esas cuatro CPT. Recuerde
+que en PyMC se indexa un tensor con las variables ya declaradas:
+`pt.as_tensor(P_SEXO)[Anio]` devuelve el vector de dos probabilidades
+correspondiente al año simulado.
+
+**Complete las cuatro líneas.** El orden importa: cada variable sólo puede usar
+las anteriores.
+""")
+
+ej(r"""
+with pm.Model() as m_escolar:
+    # TODO: P(Anio) es marginal, no depende de nadie
+    Anio = pm.Categorical("Anio", p=pt.as_tensor(np.ones(nA) / nA))
+
+    # TODO: P(Sexo | Anio) -> indexe P_SEXO por Anio
+    Sexo = pm.Categorical("Sexo", p=pt.as_tensor(np.ones(nS) / nS))
+
+    # TODO: P(Dep | Anio, Sexo) -> indexe P_DEP por Anio y Sexo
+    Dep = pm.Categorical("Dep", p=pt.as_tensor(np.ones(nD) / nD))
+
+    # TODO: P(D=1 | Anio, Sexo, Dep) -> indexe TASA por las tres
+    D = pm.Bernoulli("D", 0.5)
+
+mc_escolar = muestrear_cat(m_escolar)
+ARISTAS_ESCOLAR = [("Anio", "Sexo"), ("Anio", "Dep"), ("Sexo", "Dep"),
+                   ("Anio", "D"), ("Sexo", "D"), ("Dep", "D")]
+""", r"""
+with pm.Model() as m_escolar:
+    Anio = pm.Categorical("Anio", p=pt.as_tensor(P_ANIO))
+    Sexo = pm.Categorical("Sexo", p=pt.as_tensor(P_SEXO)[Anio])
+    Dep = pm.Categorical("Dep", p=pt.as_tensor(P_DEP)[Anio, Sexo])
+    D = pm.Bernoulli("D", pt.as_tensor(TASA)[Anio, Sexo, Dep])
+
+mc_escolar = muestrear_cat(m_escolar)
+ARISTAS_ESCOLAR = [("Anio", "Sexo"), ("Anio", "Dep"), ("Sexo", "Dep"),
+                   ("Anio", "D"), ("Sexo", "D"), ("Dep", "D")]
+""")
+
+code(r"""
+# Verificacion: la muestra tiene que reproducir la tabla del MINEDUC.
+global_teorico = datos.desvinculados.sum() / datos.matricula.sum()
+comparar("P(D=1) global", global_teorico, p(mc_escolar, {"D": 1}))
+
+print()
+for k, dep in enumerate(DEPS):
+    sub = datos[datos.dep == dep]
+    comparar(f"P(D=1 | {dep[:18]})",
+             sub.desvinculados.sum() / sub.matricula.sum(),
+             p(mc_escolar, {"D": 1}, {"Dep": k}))
+
+print()
+for j, sexo in enumerate(SEXOS):
+    sub = datos[datos.sexo == sexo]
+    comparar(f"P(D=1 | {sexo})",
+             sub.desvinculados.sum() / sub.matricula.sum(),
+             p(mc_escolar, {"D": 1}, {"Sexo": j}))
+
+print()
+celda = datos[(datos.anio == 2024) & (datos.sexo == "Hombre")
+              & (datos.dep == "Municipal")]
+comparar("P(D=1 | 2024, Hombre, Municipal)", float(celda.tasa.iloc[0]),
+         p(mc_escolar, {"D": 1}, {"Anio": idx_anio[2024], "Sexo": 1, "Dep": 0}))
+""")
+
+md(r"""
+## 5.2 El grafo, y por qué hay confusión
+
+El modelo que acaba de declarar tiene este DAG:
+
+```
+        Anio ────────┐
+         │  \        │
+         │   \       ▼
+         │    ──► Dep ──► D
+         │        ▲       ▲
+         ▼        │       │
+        Sexo ─────┴───────┘
+```
+
+Para la pregunta «¿qué pasa si intervengo la dependencia?», el camino que
+interesa es el directo $\texttt{Dep} \to D$. Pero existe además
+
+$$\texttt{Dep} \leftarrow \texttt{Anio} \to D$$
+
+que es una **causa común** (sección 2.2): el año empuja a la vez la composición
+del sistema y la tasa. Ese camino de puerta trasera (*backdoor*) contamina el
+contraste observacional. Lo mismo con $\texttt{Dep} \leftarrow \texttt{Sexo} \to D$.
+
+Concretamente: los municipales pesan más en los años **viejos**, que son los de
+tasa alta; el SLEP sólo existe en años **recientes**, que son los de tasa baja.
+Comparar sus tasas crudas es comparar épocas distintas, no dependencias.
+""")
+
+code(r"""
+# El criterio grafico confirma la lectura: hay camino activo entre Dep y D
+# aunque no se pase por la arista directa, y {Anio, Sexo} lo bloquea.
+sin_directa = [a for a in ARISTAS_ESCOLAR if a != ("Dep", "D")]
+
+print("Camino Dep - D con la arista directa borrada:")
+print(f"  sin condicionar        -> activo: "
+      f"{camino_activo(sin_directa, 'Dep', 'D')}")
+print(f"  condicionando en Anio  -> activo: "
+      f"{camino_activo(sin_directa, 'Dep', 'D', ['Anio'])}")
+print(f"  condicionando en ambos -> activo: "
+      f"{camino_activo(sin_directa, 'Dep', 'D', ['Anio', 'Sexo'])}")
+
+check("{Anio, Sexo} bloquea toda puerta trasera Dep -> D",
+      d_separado(sin_directa, "Dep", "D", ["Anio", "Sexo"]),
+      "revise ARISTAS_ESCOLAR")
+""")
+
+md(r"""
+---
+## Ejercicio 10 — Ajuste por puerta trasera
+
+Como $\{\texttt{Anio}, \texttt{Sexo}\}$ bloquea todos los caminos de puerta
+trasera y ninguno de los dos es descendiente de `Dep`, el conjunto satisface el
+**criterio de puerta trasera** y el efecto es identificable:
+
+$$P(D=1 \mid do(\texttt{Dep}=d)) = \sum_{a}\sum_{s} P(D=1 \mid a, s, d)\; P(a, s)$$
+
+Note la diferencia con el condicional observacional, que pesa con
+$P(a, s \mid d)$ — la composición **de esa dependencia** — en vez de con
+$P(a, s)$ — la composición **del sistema completo**:
+
+$$P(D=1 \mid \texttt{Dep}=d) = \sum_{a}\sum_{s} P(D=1 \mid a, s, d)\; P(a, s \mid d)$$
+
+Las mismas tasas por celda, distintos pesos. Eso es todo lo que hace el
+ajuste.
+
+**Complete `tasa_intervenida`**: es la primera fórmula, con `TASA[:, :, k]` como
+$P(D=1 \mid a, s, d)$ y `P_CONJUNTA_AS` como $P(a, s)$.
+""")
+
+code(r"""
+# P(a, s): la composicion del sistema completo, sin mirar la dependencia.
+P_CONJUNTA_AS = MATRICULA.sum(axis=2) / MATRICULA.sum()
+print("P(a,s) suma", P_CONJUNTA_AS.sum().round(6), " forma", P_CONJUNTA_AS.shape)
+
+
+def tasa_cruda(dep):
+    # P(D=1 | Dep=dep) leida de la tabla.
+    sub = datos[datos.dep == dep]
+    return sub.desvinculados.sum() / sub.matricula.sum()
+""")
+
+ej(r"""
+def tasa_intervenida(dep, anios=None):
+    # P(D=1 | do(Dep=dep)), restringido a `anios` si se entrega.
+    k = idx_dep[dep]
+    filas = [idx_anio[a] for a in (anios if anios is not None else ANIOS)]
+
+    if not EXISTE[np.ix_(filas, range(nS), [k])].all():
+        return np.nan          # sin soporte: ver Ejercicio 11
+
+    pesos = P_CONJUNTA_AS[filas]
+    pesos = pesos / pesos.sum()
+
+    # TODO: promedie TASA[filas, :, k] con esos pesos
+    return np.nan
+""", r"""
+def tasa_intervenida(dep, anios=None):
+    # P(D=1 | do(Dep=dep)), restringido a `anios` si se entrega.
+    k = idx_dep[dep]
+    filas = [idx_anio[a] for a in (anios if anios is not None else ANIOS)]
+
+    if not EXISTE[np.ix_(filas, range(nS), [k])].all():
+        return np.nan          # sin soporte: ver Ejercicio 11
+
+    pesos = P_CONJUNTA_AS[filas]
+    pesos = pesos / pesos.sum()
+
+    return float((TASA[filas][:, :, k] * pesos).sum())
+""")
+
+code(r"""
+# Verificacion: el ajuste analitico contra la simulacion de la intervencion.
+# pm.do borra las aristas que entran a Dep y la fija en k: es el grafo mutilado.
+print(f"{'dependencia':<30}{'cruda':>9}{'do() formula':>14}{'do() pm.do':>13}")
+print("-" * 66)
+for k, dep in enumerate(DEPS):
+    formula = tasa_intervenida(dep)
+    if np.isnan(formula):
+        print(f"{dep:<30}{100 * tasa_cruda(dep):8.2f}%{'no definida':>14}"
+              f"{'--':>13}")
+        continue
+    mc_do = muestrear_cat(pm.do(m_escolar, {"Dep": k}), n=100_000)
+    print(f"{dep:<30}{100 * tasa_cruda(dep):8.2f}%{100 * formula:13.2f}%"
+          f"{100 * mc_do.D.mean():12.2f}%")
+    comparar(f"  do({dep[:16]})", formula, p(mc_do, {"D": 1}))
+""")
+
+md(r"""
+> **Lo que hay que saber leer aquí.** Para las cuatro dependencias que existen
+> los quince años, el ajuste **casi no mueve nada** (Municipal 2,05 % → 1,99 %).
+> No es un error: significa que la confusión por año y sexo es débil, porque
+> $P(a)$ es casi uniforme y la composición por sexo es casi constante. Ajustar
+> no siempre cambia la respuesta, y eso también es un resultado.
+>
+> El SLEP es otra historia, y no porque su confusión sea fuerte.
+""")
+
+md(r"""
+---
+## Ejercicio 11 — Positividad: el caso del SLEP
+
+Leída sin cuidado, la tabla dice que el **Servicio Local de Educación** tiene
+una tasa de 1,56 %, contra 2,05 % de los municipales de los que heredó la
+matrícula: casi un cuarto menos. Sería un argumento fuerte a favor de la
+desmunicipalización.
+
+El problema es que el SLEP **no existe antes de 2018**. Su tasa cruda no es un
+promedio sobre 2010–2024: es un promedio sobre 2018–2024, años en que *todas*
+las dependencias bajaron. La fórmula de ajuste ni siquiera está definida, porque
+exige $P(\texttt{Dep} = \text{SLEP} \mid a, s) > 0$ para todo $(a,s)$ — la
+condición de **positividad** o soporte común. Por eso `tasa_intervenida`
+devuelve `nan`.
+
+La única comparación honesta es sobre el soporte común.
+
+**(a)** Complete `ANIOS_SLEP` con los años en que el SLEP tiene matrícula.
+**(b)** Compare las cinco dependencias **sobre esos años**, y responda si
+sobrevive la ventaja del SLEP.
+""")
+
+ej(r"""
+# TODO (a): los anios donde EXISTE es verdadero para el SLEP (en ambos sexos)
+ANIOS_SLEP = ANIOS
+
+print(f"El SLEP tiene matricula en {len(ANIOS_SLEP)} de {len(ANIOS)} anios: "
+      f"{ANIOS_SLEP}")
+""", r"""
+# (a) los anios donde EXISTE es verdadero para el SLEP (en ambos sexos)
+k_slep = idx_dep["Servicio Local de educación"]
+ANIOS_SLEP = [a for a in ANIOS if EXISTE[idx_anio[a], :, k_slep].all()]
+
+print(f"El SLEP tiene matricula en {len(ANIOS_SLEP)} de {len(ANIOS)} anios: "
+      f"{ANIOS_SLEP}")
+""")
+
+code(r"""
+# (b) La misma comparacion, sobre todos los anios y sobre el soporte comun.
+print(f"{'dependencia':<30}{'cruda 2010-24':>15}{'do() 2010-24':>14}"
+      f"{'do() soporte':>14}")
+print("-" * 73)
+for dep in DEPS:
+    completo = tasa_intervenida(dep)
+    comun = tasa_intervenida(dep, ANIOS_SLEP)
+    txt = f"{100 * completo:13.2f}%" if not np.isnan(completo) else f"{'no def.':>14}"
+    print(f"{dep:<30}{100 * tasa_cruda(dep):14.2f}%{txt}{100 * comun:13.2f}%")
+
+slep = tasa_intervenida("Servicio Local de educación", ANIOS_SLEP)
+muni = tasa_intervenida("Municipal", ANIOS_SLEP)
+print(f"\nVentaja cruda del SLEP sobre Municipal (2010-2024): "
+      f"{100 * (tasa_cruda('Municipal') - tasa_cruda('Servicio Local de educación')):+.2f} pp")
+print(f"Ventaja sobre el soporte comun (2018-2024):        "
+      f"{100 * (muni - slep):+.2f} pp")
+
+check("la ventaja cruda del SLEP supera 0.4 pp",
+      tasa_cruda("Municipal") - tasa_cruda("Servicio Local de educación") > 0.004)
+check("sobre el soporte comun la diferencia es menor a 0.1 pp",
+      abs(muni - slep) < 0.001,
+      "compare TASA[.., SLEP] contra TASA[.., Municipal] anio por anio")
+""")
+
+md(r"""
+La ventaja desaparece por completo: sobre 2018–2024 el SLEP y los municipales
+desvinculan a la misma tasa, dentro de una centésima de punto porcentual. Los
+0,49 puntos de diferencia eran **la ventana temporal**, no la dependencia.
+
+Es el mismo mecanismo de la sección 2.2 — la causa común `Anio` — pero con una
+vuelta de tuerca: aquí no bastaba con ajustar, porque para la mitad de los años
+la pregunta «¿cuál habría sido la tasa del SLEP?» no tiene respuesta en los
+datos. Ninguna fórmula de ajuste inventa soporte que no existe; lo único
+correcto es reducir la pregunta a donde sí lo hay.
+
+> **Dos advertencias sobre lo que *no* se puede concluir.**
+>
+> 1. **`Sexo` no admite `do()`.** El contraste hombres 1,77 % / mujeres 1,48 %
+>    es real y sobrevive al ajuste por año y dependencia, pero no hay
+>    intervención que asigne el sexo de un estudiante. Es una diferencia
+>    descriptiva entre grupos, no un efecto causal: *no hay causación sin
+>    manipulación*.
+> 2. **Son datos agregados.** La tabla entrega celdas, no estudiantes. Un
+>    contraste válido entre celdas puede no valer para individuos — la
+>    **falacia ecológica**. Además `Dep` no se asigna al azar: las familias
+>    eligen colegio, y el nivel socioeconómico, que no está en esta tabla,
+>    empuja a la vez la elección y la desvinculación. Ese confusor no medido
+>    **no** lo arregla ningún ajuste sobre las variables disponibles, así que la
+>    columna `do()` de arriba vale bajo el supuesto — fuerte — de que el DAG de
+>    la sección 5.2 está completo.
+""")
+
+
 md(r"""
 ---
 ## Para pensar (sin entrega)
@@ -1162,6 +1669,13 @@ md(r"""
    $A \leftarrow C \to B$ generan exactamente las mismas independencias. Genere
    datos con una y ajuste la otra con `pm.sample`. ¿Puede distinguirlas con
    datos observacionales? ¿Qué haría falta para poder hacerlo?
+
+4. **Ajustar de más.** En el modelo escolar de la sección 5, ajuste el efecto de
+   `Dep` sobre `D` incluyendo además el **curso** (hoja «Tasas a nivel de
+   Curso»). Si la dependencia influye en el curso al que llega un estudiante,
+   el curso es un *mediador*: está en el camino causal, no en la puerta trasera.
+   ¿Qué le pasa al efecto estimado al condicionarlo? ¿Por qué el criterio de
+   puerta trasera excluye explícitamente a los descendientes del tratamiento?
 """)
 
 
