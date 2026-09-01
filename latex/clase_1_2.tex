@@ -367,7 +367,7 @@ $P \land Q \rightarrow R$: \emph{si tiene fiebre y tos seca, hay infecci\'on vir
 \end{tikzpicture}
 \end{center}
 \vspace{0.1em}
-\idea{$P \rightarrow Q$ \textbf{no} afirma causalidad: solo excluye el caso $P$ verdadero con $Q$ falso. \emph{Si la luna es de queso, apruebo el ramo} es una proposici\'on verdadera.}
+\idea{$P \rightarrow Q$ \textbf{no} afirma causalidad: solo excluye el caso $P$ verdadero con $Q$ falso. \emph{Si gano la elección, bajaré los impuestos} es una proposici\'on verdadera.}
 \end{frame}
 
 \begin{frame}
@@ -456,7 +456,7 @@ Si $\alpha$: \emph{es martes de enero} y $\beta$: \emph{es enero}, entonces $\al
 \end{center}
 \vspace{0.4em}
 \footnotesize
-Si sabemos que \emph{si llueve, Harry est\'a dentro} y adem\'as \emph{llueve}, podemos afirmar \emph{Harry est\'a dentro}.
+Si sabemos que \emph{si llueve, entonces la calle está mojada} y adem\'as \emph{llueve}, podemos afirmar \emph{la calle está mojada}.
 \end{column}
 \begin{column}{6.4cm}
 \begin{block}{Otras reglas de inferencia útiles}
@@ -647,7 +647,7 @@ El conocimiento cl\'inico rara vez es categ\'orico. MYCIN asociaba a cada regla 
 \end{column}
 \end{columns}
 \vspace{-0.2em}
-\idea{Los factores de certeza fueron una soluci\'on \emph{de ingenier\'ia}, no probabil\'istica: no satisfacen los axiomas de Kolmogorov. Las \textbf{redes bayesianas}, que vemos a continuaci\'on, son la respuesta formal al mismo problema.}
+\idea{Los factores de certeza fueron una soluci\'on \emph{de ingenier\'ia}, no probabil\'istica: no satisfacen los axiomas de Kolmogorov. Las \textbf{redes bayesianas},  son la respuesta formal al mismo problema.}
 \end{frame}
 
 %=====================================================================
@@ -670,10 +670,10 @@ El conocimiento cl\'inico rara vez es categ\'orico. MYCIN asociaba a cada regla 
 \begin{column}{6.1cm}
 \begin{block}{La alternativa formal}
 \footnotesize
-Modelar el dominio con una \textbf{distribución conjunta}. Con $E$ la enfermedad y $S$ los síntomas, toda pregunta es marginalizar y condicionar:
+Modelar el dominio con una \textbf{distribución conjunta}. Con $A$ la enfermedad y $B$ los síntomas, toda pregunta es marginalizar y condicionar:
 \vspace{-0.4em}
 \[
-P(E \mid S) \;=\; \frac{P(E, S)}{P(S)}
+P(A \mid B) \;=\; \frac{P(A, B)}{P(B)}
 \]
 \vspace{-1.2em}
 \end{block}
@@ -708,7 +708,7 @@ Usar un \textbf{grafo} para declarar qué variables interactúan \emph{directame
 \end{tikzpicture}
 \end{center}
 \footnotesize
-\textbf{Dirigidos --- redes bayesianas}\\
+\textbf{Dirigidos --- Bayesian Networks}\\
 Aristas con dirección y sin ciclos: dependencia \emph{asimétrica}, a menudo causal. Factorizan en probabilidades condicionales, ya normalizadas.
 \end{column}
 \begin{column}{6.1cm}
@@ -724,7 +724,7 @@ Aristas con dirección y sin ciclos: dependencia \emph{asimétrica}, a menudo ca
 \end{tikzpicture}
 \end{center}
 \footnotesize
-\textbf{No dirigidos --- campos de Markov}\\
+\textbf{No dirigidos --- Markov Random Fields}\\
 Aristas simétricas. Factorizan en \emph{potenciales} sobre cliques, con una constante global $Z$ que suele ser intratable. Útiles cuando no hay dirección natural.
 \end{column}
 \end{columns}
