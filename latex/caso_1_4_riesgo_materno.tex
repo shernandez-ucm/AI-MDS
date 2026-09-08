@@ -1,0 +1,338 @@
+% =====================================================================
+%  Estudio de casos --- MDS221 Inteligencia Artificial
+%  Basado en clase_1_4.tex (¿Por qué funciona el aprendizaje profundo?)
+%  Dataset: Maternal Health Risk (UCI id 863) vía Tzimourta et al. (2025)
+% =====================================================================
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[provide=*,spanish]{babel}
+\usepackage[margin=2.1cm]{geometry}
+\usepackage{amsmath, amssymb, bm}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{titlesec}
+\usepackage[colorlinks=true, allbordercolors=white]{hyperref}
+
+% ---------- Paleta UCM (la misma de las clases) ----------
+\definecolor{UCMBlue}{RGB}{4, 171, 226}
+\definecolor{UCMNavy}{RGB}{20, 65, 134}
+\definecolor{AccentGreen}{RGB}{0, 130, 100}
+\definecolor{StanfordRed}{RGB}{140, 21, 21}
+\definecolor{StanfordGray}{RGB}{77, 77, 77}
+\definecolor{LightGray}{RGB}{240, 240, 240}
+
+\hypersetup{linkcolor=UCMNavy, urlcolor=UCMNavy, citecolor=UCMNavy}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{UCMNavy}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{UCMBlue!80!black}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.6em}
+
+\setlist[itemize]{leftmargin=1.2em, itemsep=2pt, topsep=3pt}
+\setlist[enumerate]{leftmargin=1.4em, itemsep=2pt, topsep=3pt}
+
+% ---------- Cajas ----------
+\newtcolorbox{pregunta}{colback=UCMBlue!7, colframe=UCMBlue, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+\newtcolorbox{aviso}{colback=StanfordRed!5, colframe=StanfordRed, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+\newtcolorbox{entrega}{colback=AccentGreen!6, colframe=AccentGreen, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+
+% Vínculo explícito con la clase
+\newcommand{\enlace}[1]{\par\vspace{2pt}{\footnotesize\color{StanfordGray}%
+	$\hookrightarrow$\ \textit{Clase 1.4:} #1}}
+
+\begin{document}
+
+% =====================================================================
+\begin{center}
+{\LARGE\bfseries\color{UCMNavy} Estudio de casos}\\[4pt]
+{\Large\bfseries ¿Por qué (no) funciona el aprendizaje profundo\\ en la detección de riesgo materno?}\\[10pt]
+{\normalsize MDS221 --- Inteligencia Artificial \quad$\bullet$\quad Unidad 1, clase 1.4}\\[2pt]
+{\normalsize Mag\'ister en Data Science --- Universidad Cat\'olica del Maule}\\[2pt]
+{\small Sergio Hern\'andez, PhD \quad$\bullet$\quad \texttt{shernandez@ucm.cl}}
+\end{center}
+\vspace{0.4em}
+\hrule
+\vspace{1em}
+
+\noindent
+\begin{tabularx}{\textwidth}{@{}p{3.2cm}X@{}}
+\textbf{Modalidad} & Grupos de 2 o 3 estudiantes.\\
+\textbf{Dedicaci\'on} & Aproximadamente 12 horas de trabajo aut\'onomo.\\
+\textbf{Entregables} & Cuaderno reproducible \texttt{.ipynb} + informe en PDF (6--8 p\'aginas).\\
+\textbf{Evaluaci\'on} & R\'ubrica de la secci\'on~\ref{sec:rubrica} (240 puntos, 60\,\% de exigencia).\\
+\end{tabularx}
+
+\vspace{0.8em}
+\begin{pregunta}
+\textbf{El caso en una frase.} Un art\'iculo publicado en \emph{Healthcare} (2025) compara seis clasificadores para predecir el nivel de riesgo de una embarazada a partir de seis signos vitales. El \textbf{bosque aleatorio alcanza 84{,}5\,\%} de exactitud; las \textbf{redes neuronales se quedan en 69\,\%}. La clase 1.4 sostiene que la sobreparametrizaci\'on y la profundidad son justamente lo que hace funcionar al aprendizaje profundo. \textbf{¿Por qu\'e aqu\'i pierde?}
+\end{pregunta}
+
+% =====================================================================
+\section{Contexto clínico}
+
+La mortalidad materna sigue siendo uno de los indicadores de salud m\'as sensibles a la desigualdad: la mayor\'ia de las muertes ocurre en contextos con acceso tard\'io o intermitente al control prenatal, y una fracci\'on importante es evitable si el riesgo se detecta a tiempo. En ese escenario, un sistema de \emph{triage} que priorice a qui\'en derivar --- construido sobre mediciones baratas y repetibles (presi\'on, glicemia, temperatura, pulso) --- tiene un valor cl\'inico directo, incluso si su exactitud es modesta.
+
+Tzimourta et al.~(2025) exploran precisamente eso: entrenan seis clasificadores sobre registros recolectados mediante un sistema de monitoreo IoT en hospitales, clínicas comunitarias y centros de salud materna de Bangladesh, y comparan su desempe\~no para clasificar el riesgo en tres niveles.
+
+% =====================================================================
+\section{El conjunto de datos}
+
+\noindent\textbf{Maternal Health Risk} --- UCI Machine Learning Repository, id 863.
+DOI \texttt{10.24432/C5DP5D}, licencia CC BY 4.0.\\
+\url{https://archive.ics.uci.edu/dataset/863/maternal+health+risk}
+
+\vspace{0.6em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{Variable} & \textbf{Unidad} & \textbf{Descripci\'on}\\
+\midrule
+\texttt{Age}          & a\~nos      & Edad de la gestante.\\
+\texttt{SystolicBP}   & mmHg        & Presi\'on arterial sist\'olica.\\
+\texttt{DiastolicBP}  & mmHg        & Presi\'on arterial diast\'olica.\\
+\texttt{BS}           & mmol/L      & Glicemia (\emph{blood sugar}).\\
+\texttt{BodyTemp}     & $^\circ$F   & Temperatura corporal.\\
+\texttt{HeartRate}    & lpm         & Frecuencia card\'iaca en reposo.\\
+\midrule
+\texttt{RiskLevel}    & ---         & \textbf{Objetivo}: \emph{low risk} (406), \emph{mid risk} (336), \emph{high risk} (272).\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.6em}
+\noindent
+Seis atributos, tres clases, y del orden de mil registros. Se descarga con:
+
+\vspace{0.3em}
+\noindent\colorbox{LightGray}{\parbox{\dimexpr\textwidth-2\fboxsep}{\ttfamily\small
+from ucimlrepo import fetch\_ucirepo\\
+mhr = fetch\_ucirepo(id=863)\\
+X, y = mhr.data.features, mhr.data.targets
+}}
+
+\begin{aviso}
+\textbf{Primera discrepancia, y es suya para resolver.} El art\'iculo declara \textbf{1014} instancias (1013 tras corregir dos frecuencias card\'iacas imposibles de 7\,lpm); la ficha actual de UCI reporta \textbf{1013}. Verifique cu\'antas filas trae su descarga, cu\'antas est\'an \textbf{duplicadas exactamente} y d\'ejelo documentado antes de entrenar nada. La cifra que obtenga condiciona todo lo que sigue.
+\end{aviso}
+
+% =====================================================================
+\section{El resultado que hay que explicar}
+
+Los autores entrenan con validaci\'on cruzada de 10 pliegues y reportan:
+
+\vspace{0.5em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}Xccc@{}}
+\toprule
+\textbf{Clasificador} & \textbf{Exactitud} & \textbf{Precisi\'on} & \textbf{Sensibilidad (TP rate)}\\
+\midrule
+Na\"ive Bayes                     & 59{,}07\,\% & 58{,}10\,\% & 59{,}10\,\%\\
+Perceptr\'on multicapa (MLP)      & 69{,}03\,\% & 61{,}04\,\% & 61{,}01\,\%\\
+Red totalmente conectada (FCNN)   & 68{,}93\,\% & 68{,}96\,\% & 68{,}91\,\%\\
+M\'aquina de soporte vectorial    & 75{,}74\,\% & 76{,}30\,\% & 75{,}70\,\%\\
+\'Arbol de decisi\'on             & 78{,}60\,\% & 79{,}00\,\% & 78{,}60\,\%\\
+\textbf{Bosque aleatorio}         & \textbf{84{,}52\,\%} & \textbf{84{,}93\,\%} & \textbf{84{,}52\,\%}\\
+\textbf{Bosque aleatorio + SMOTE} & \textbf{88{,}03\,\%} & \textbf{88{,}10\,\%} & \textbf{88{,}00\,\%}\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.8em}
+\noindent
+Las dos arquitecturas neuronales quedan \textbf{\'ultimas entre los m\'etodos no triviales}, quince puntos por debajo del bosque. Ese es el hecho a explicar. La clase 1.4 entrega el vocabulario para hacerlo: sobreparametrizaci\'on, umbral de interpolaci\'on, doble descenso, planitud del m\'inimo, sesgo inductivo, billete de loter\'ia. El trabajo consiste en \textbf{usar ese vocabulario como instrumento de medici\'on}, no como decorado.
+
+\begin{pregunta}
+\textbf{Pregunta central del caso.} ¿El fracaso relativo de las redes neuronales en este problema es (a) un problema de \emph{capacidad} --- faltan par\'ametros o datos ---, (b) un problema de \emph{optimizaci\'on} --- la soluci\'on existe pero el entrenamiento no la encuentra ---, o (c) un problema de \emph{sesgo inductivo} --- la arquitectura no encaja con la estructura del dato? Su informe debe defender una respuesta \textbf{con evidencia propia}, no con citas.
+\end{pregunta}
+
+% =====================================================================
+\section{Tareas}
+
+Cada tarea indica con qu\'e parte de la clase 1.4 se conecta. Todos los experimentos se reportan con \textbf{al menos 5 semillas} y con media $\pm$ desviaci\'on est\'andar: una diferencia de dos puntos sin barras de error no es un resultado.
+
+\subsection*{T1 --- Línea base y auditoría del dato}
+\begin{enumerate}
+	\item Reproduzca la l\'inea base: bosque aleatorio y MLP con validaci\'on cruzada estratificada de 10 pliegues. Compare sus n\'umeros con la tabla anterior y explique cualquier brecha mayor a 3 puntos.
+	\item Cuente las filas duplicadas exactas. Reeval\'ue asegurando que \textbf{ning\'un duplicado quede a ambos lados} de la partici\'on. ¿Cu\'anta exactitud se pierde? Discuta qu\'e parte del 84{,}5\,\% original era memorizaci\'on medida sobre s\'i misma.
+	\item Con clases 406/336/272, argumente por qu\'e la exactitud sola es un mal resumen. Reporte matriz de confusi\'on y F1 por clase.
+\end{enumerate}
+\enlace{secci\'on ``¿Son los datos?'' --- la advertencia de Zhang et al.\ es que una red memoriza \emph{cualquier} conjunto finito; su validaci\'on tiene que estar dise\~nada para notar la diferencia.}
+
+\subsection*{T2 --- ¿Puede la red memorizar este problema?}
+\begin{enumerate}
+	\item Permute \texttt{RiskLevel} al azar, destruyendo toda relaci\'on con las variables. Entrene MLP de ancho creciente hasta llevar el error de \textbf{entrenamiento} a cero.
+	\item Reporte el n\'umero m\'inimo de par\'ametros necesario y comp\'arelo con $n \approx 1000$ ejemplos. ¿Cu\'antas veces sobreparametrizado quedó el modelo?
+	\item Repita con las etiquetas reales. ¿Necesita m\'as o menos capacidad? ¿Qu\'e dice eso sobre la ``simplicidad'' de la funci\'on subyacente?
+\end{enumerate}
+\enlace{r\'eplica en miniatura del experimento de Zhang et al.\ (2017) que aparece en la l\'amina de p\'ixeles y etiquetas aleatorias.}
+
+\subsection*{T3 --- Barrido de capacidad: ¿aparece el doble descenso?}
+\begin{enumerate}
+	\item MLP de una capa oculta con ancho en escala logar\'itmica, de 2 a 2048 unidades. Grafique error de entrenamiento y de prueba contra n\'umero de par\'ametros.
+	\item Marque el \textbf{umbral de interpolaci\'on} (par\'ametros $\approx$ datos). ¿Observa el pico y el segundo descenso, o solo la curva en U cl\'asica?
+	\item Si \textbf{no} aparece el doble descenso, no lo fuerce: explique qu\'e condiciones de la clase 1.4 no se cumplen aqu\'i (tama\~no de $n$, ruido de etiqueta, regularizaci\'on impl\'icita del optimizador).
+\end{enumerate}
+\enlace{l\'amina ``Sobreparametrizaci\'on y doble descenso''. Recuerde: la curva en U cl\'asica no est\'a mal, est\'a \emph{incompleta} --- pero solo cuando se llega al r\'egimen moderno.}
+
+\subsection*{T4 --- Razón lote/tasa y planitud del mínimo}
+\begin{enumerate}
+	\item Grilla de tama\~no de lote $\in \{8, 32, 128, 512\}$ por tasa de aprendizaje $\in \{10^{-3}, 10^{-2}, 10^{-1}\}$. Grafique el error de prueba contra la \textbf{raz\'on lote/tasa}.
+	\item Estime la planitud de cada m\'inimo: p\'erdida m\'axima en una vecindad $\lVert\bm\delta\rVert = \varepsilon$ alrededor de los par\'ametros finales (criterio de Keskar), con al menos 20 direcciones aleatorias.
+	\item ¿Correlacionan planitud y generalizaci\'on \textbf{en este problema}? Contraste su resultado con la advertencia de Dinh et al.\ sobre reparametrizaciones triviales de ReLU.
+\end{enumerate}
+\enlace{l\'aminas ``El algoritmo elige a cu\'al m\'inimo llegar'' y ``Planitud del m\'inimo''.}
+
+\subsection*{T5 --- Billete de lotería a escala pequeña}
+\begin{enumerate}
+	\item Entrene su mejor MLP y guarde la inicializaci\'on. Pode por magnitud hasta conservar el 20\,\%, 10\,\% y 5\,\% de los pesos.
+	\item Reentrene dos veces cada subred: (a) desde \textbf{la misma} inicializaci\'on original, (b) desde una inicializaci\'on aleatoria nueva.
+	\item ¿Se reproduce el resultado de Frankle \& Carbin a esta escala? Si la diferencia entre (a) y (b) desaparece, discuta si es porque el modelo es demasiado peque\~no para contener ``billetes ganadores''.
+\end{enumerate}
+\enlace{l\'aminas ``Activaci\'on, inicializaci\'on y profundidad'' y ``Poda''.}
+
+\subsection*{T6 --- Sesgo inductivo: por qué gana el bosque}
+\begin{enumerate}
+	\item Formule una hip\'otesis concreta sobre por qu\'e un \emph{ensemble} de \'arboles supera a una red en datos tabulares peque\~nos, y dise\~ne \textbf{un experimento que pueda refutarla}.
+	\item Contraprueba obligatoria: intente cerrar la brecha con al menos dos intervenciones (normalizaci\'on por variable, regularizaci\'on fuerte, \emph{early stopping}, \emph{embeddings} de variables discretizadas, \emph{ensemble} de redes). Reporte cu\'anto se acorta.
+	\item Relacione su conclusi\'on con las tres explicaciones que la clase da para la profundidad: complejidad de la funci\'on, tratabilidad del entrenamiento y sesgo inductivo.
+\end{enumerate}
+\enlace{l\'aminas ``Arquitectura: el sesgo inductivo'' y ``Tres explicaciones posibles para la profundidad''.}
+
+\subsection*{T7 --- Lectura clínica: el error que no cuesta lo mismo}
+\begin{enumerate}
+	\item Un falso negativo de \emph{high risk} y un falso positivo de \emph{low risk} no son equivalentes. Proponga una matriz de costos justificada cl\'inicamente y reeval\'ue \textbf{todos} los modelos bajo ese criterio. ¿Cambia el ranking?
+	\item Reporte expl\'icitamente la sensibilidad de la clase \emph{high risk} y ajuste umbrales o pesos de clase para maximizarla a costo controlado.
+	\item Robustez: perturbe las se\~nales $\pm 5\,\%$ (error plausible de un tensi\'ometro o un term\'ometro) y mida la ca\'ida de desempe\~no de cada modelo. Discuta la analog\'ia con los ejemplos adversarios de la clase: ¿qu\'e tan lejos de la variedad de datos hay que ir para romper la predicci\'on?
+	\item Los datos provienen de centros de salud de Bangladesh mediante sensores IoT. Discuta qu\'e supuestos habr\'ia que revisar antes de siquiera considerar un despliegue en la red asistencial chilena.
+\end{enumerate}
+\enlace{l\'aminas ``Salir de la variedad de datos'' y ``Lo que todav\'ia no sabemos''.}
+
+% =====================================================================
+\section{Entregables}
+
+\begin{entrega}
+\begin{enumerate}[leftmargin=1.6em]
+	\item \textbf{Cuaderno reproducible} (\texttt{.ipynb}). Debe correr de principio a fin sin intervenci\'on manual, con semillas fijadas y la descarga del dato incluida. Un cuaderno que no corre se eval\'ua como si no se hubiera entregado.
+	\item \textbf{Informe} en PDF, 6 a 8 p\'aginas, con esta estructura m\'inima:
+	\begin{itemize}
+		\item Auditor\'ia del dato y l\'inea base corregida (T1).
+		\item Resultados de T2--T5, cada uno con su figura y su lectura.
+		\item Su respuesta a la pregunta central: (a) capacidad, (b) optimizaci\'on o (c) sesgo inductivo --- \textbf{y por qu\'e descarta las otras dos}.
+		\item Secci\'on cl\'inica y \'etica (T7).
+		\item Una secci\'on final de \textbf{l\'imites}: qu\'e no logr\'o establecer y qu\'e experimento habr\'ia hecho falta.
+	\end{itemize}
+	\item \textbf{Tabla resumen} de una p\'agina con todos los modelos entrenados: arquitectura, n\'umero de par\'ametros, protocolo, m\'etrica, media $\pm$ desviaci\'on.
+\end{enumerate}
+\end{entrega}
+
+\vspace{0.4em}
+\noindent
+\textbf{Sobre el uso de asistentes de IA.} Est\'a permitido y se espera que lo declaren: incluyan un p\'arrafo indicando qu\'e herramienta usaron y para qu\'e. Lo que se eval\'ua es el criterio con que interpretan los resultados, y eso no se delega. Un informe con conclusiones que el propio cuaderno no respalda se penaliza en \emph{Precisi\'on y rigor}, independientemente de qui\'en lo haya escrito.
+
+\begin{aviso}
+\textbf{Un resultado negativo bien establecido vale tanto como uno positivo.} Si tras un barrido honesto la red sigue perdiendo contra el bosque, esa \emph{es} la conclusi\'on: el cap\'itulo 20 sostiene que la sobreparametrizaci\'on ayuda \textbf{a la escala y complejidad de los conjuntos que se usan hoy en visi\'on y lenguaje}, no que una red gane siempre. Lo que no se acepta es afirmar sin medir.
+\end{aviso}
+
+% =====================================================================
+\section{Rúbrica de evaluación}
+\label{sec:rubrica}
+
+\noindent
+Seis criterios, cuatro niveles. Puntaje m\'aximo \textbf{240 puntos}.
+
+\vspace{0.6em}
+\footnotesize
+\noindent
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.35cm} XXXX@{}}
+\toprule
+\textbf{Aspecto} & \textbf{Excelente (40)} & \textbf{Bueno (30)} & \textbf{Aceptable (20)} & \textbf{Bajo (10)}\\
+\midrule
+
+\textbf{Reproducción y rigor experimental}
+& Reproduce la l\'inea base, detecta y trata los duplicados, y todo resultado viene con semillas m\'ultiples y dispersi\'on. El cuaderno corre completo.
+& Reproduce la l\'inea base con un protocolo correcto; la auditor\'ia del dato o la repetici\'on con semillas es parcial.
+& Reproduce resultados pero con un protocolo discutible (fuga posible, una sola semilla, m\'etrica \'unica).
+& No reproduce la l\'inea base o el cuaderno no corre; las cifras no son verificables.\\
+\addlinespace[3pt]
+
+\textbf{Diseño de los experimentos}
+& Los barridos de T2--T5 est\'an bien dise\~nados, con rangos justificados y controles que permiten aislar la causa.
+& Los experimentos son correctos pero alguno tiene rango insuficiente o le falta un control.
+& Ejecuta los experimentos m\'inimos sin justificar las decisiones de dise\~no.
+& Los experimentos no permiten concluir nada: rangos arbitrarios, sin controles, o incompletos.\\
+\addlinespace[3pt]
+
+\textbf{Interpretación teórica (cap.~20)}
+& Usa los conceptos de la clase como instrumento de medici\'on; distingue con evidencia entre capacidad, optimizaci\'on y sesgo inductivo, y reconoce lo que sus datos \emph{no} permiten afirmar.
+& Aplica los conceptos correctamente y defiende una tesis, con alguna afirmaci\'on que excede la evidencia.
+& Menciona los conceptos correctos pero la conexi\'on con sus propios resultados es d\'ebil o decorativa.
+& Usa el vocabulario de forma err\'onea o repite las conclusiones del art\'iculo sin contrastarlas.\\
+\addlinespace[3pt]
+
+\textbf{Análisis de datos y evidencia}
+& An\'alisis profundo: figuras legibles y bien elegidas, incertidumbre reportada, comparaciones justas entre modelos.
+& An\'alisis s\'olido; las figuras comunican, con mejoras posibles en claridad o en el tratamiento de la incertidumbre.
+& An\'alisis adecuado pero superficial; faltan m\'etricas por clase o las figuras no aportan al argumento.
+& An\'alisis superficial o inconsistente con las cifras del cuaderno.\\
+\addlinespace[3pt]
+
+\textbf{Comunicación del informe}
+& Preciso, bien estructurado y sin errores; cada afirmaci\'on es rastreable hasta una figura o tabla.
+& Bien organizado, con pocos errores menores.
+& Se entiende, pero la estructura o la redacci\'on dificultan seguir el argumento.
+& Desorganizado, impreciso o con errores graves que impiden la comprensi\'on.\\
+\addlinespace[3pt]
+
+\textbf{Lectura clínica y ética}
+& Trata el costo asim\'etrico del error con una matriz justificada, reeval\'ua bajo ese criterio y discute con seriedad los l\'imites de transferir el modelo a otro sistema de salud.
+& Aborda el costo asim\'etrico y los l\'imites del despliegue, con menos profundidad o sin reevaluar los modelos.
+& Menciona el problema \'etico de forma gen\'erica, sin consecuencias sobre el an\'alisis.
+& Omite la dimensi\'on cl\'inica o la reduce a una frase de cierre.\\
+\bottomrule
+\end{tabularx}
+
+\normalsize
+\vspace{1em}
+\noindent\textbf{Conversión a nota} (60\,\% de exigencia, $P$ = puntaje sobre 240):
+\[
+\text{Nota} =
+\begin{cases}
+1{,}0 + 3{,}0\,\dfrac{P}{144} & \text{si } P < 144,\\[8pt]
+4{,}0 + 3{,}0\,\dfrac{P-144}{96} & \text{si } P \geq 144.
+\end{cases}
+\]
+
+\vspace{0.4em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}l *{8}{>{\centering\arraybackslash}X}@{}}
+\toprule
+\textbf{Puntaje} & 48 & 96 & 120 & \textbf{144} & 168 & 192 & 216 & \textbf{240}\\
+\textbf{Nota}    & 2{,}0 & 3{,}0 & 3{,}5 & \textbf{4{,}0} & 4{,}75 & 5{,}5 & 6{,}25 & \textbf{7{,}0}\\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{Referencias}
+
+\begin{itemize}
+	\item Tzimourta, K.\,D., Tsipouras, M.\,G., Angelidis, P., Tsalikakis, D.\,G. \& Orovou, E. (2025). \emph{Maternal Health Risk Detection: Advancing Midwifery with Artificial Intelligence}. Healthcare, 13(7), 833.\\ \url{https://doi.org/10.3390/healthcare13070833}
+	\item Ahmed, M. (2023). \emph{Maternal Health Risk} [conjunto de datos]. UCI Machine Learning Repository.\\ \url{https://doi.org/10.24432/C5DP5D}
+	\item Prince, S.\,J.\,D. \emph{Understanding Deep Learning}, cap\'itulo 20 (\emph{Why does deep learning work?}) y cap\'itulo 8 (doble descenso). MIT Press.\\ \url{https://udlbook.github.io/udlbook/}
+	\item Zhang, C., Bengio, S., Hardt, M., Recht, B. \& Vinyals, O. (2017). \emph{Understanding deep learning requires rethinking generalization}. ICLR.
+	\item Frankle, J. \& Carbin, M. (2019). \emph{The lottery ticket hypothesis: finding sparse, trainable neural networks}. ICLR.
+	\item Keskar, N.\,S., Mudigere, D., Nocedal, J., Smelyanskiy, M. \& Tang, P.\,T.\,P. (2017). \emph{On large-batch training for deep learning: generalization gap and sharp minima}. ICLR.
+	\item Grinsztajn, L., Oyallon, E. \& Varoquaux, G. (2022). \emph{Why do tree-based models still outperform deep learning on typical tabular data?} NeurIPS Datasets and Benchmarks.
+\end{itemize}
+
+\vspace{1em}
+\hrule
+\vspace{0.4em}
+\noindent{\footnotesize\color{StanfordGray}
+Material del curso MDS221, Mag\'ister en Data Science, Universidad Cat\'olica del Maule. El conjunto de datos se distribuye bajo licencia CC BY 4.0 y el art\'iculo de referencia bajo CC BY.}
+
+\end{document}
