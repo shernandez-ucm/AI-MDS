@@ -378,3 +378,4 @@ MigrationBackup/
 labs/messi5.jpg
 labs/sudoku.png
 labs/data/*
+ .~lock.*#
