@@ -165,18 +165,18 @@ Esta clase no presenta resultados establecidos: presenta \textbf{preguntas abier
 	fl/.style={-{Stealth[length=2.5mm]}, thick, gray!75}]
 
 	\node[caja] (a) at (0,0)
-		{\textbf{Sorpresa 1: el ajuste}\\
+		{\textbf{El ajuste}\\
 		 encontrar el m\'inimo global de una\\ funci\'on no convexa es NP-duro};
 	\node[caja] (b) at (6.6,0)
-		{\textbf{Sorpresa 2: la generalizaci\'on}\\
+		{\textbf{La generalizaci\'on}\\
 		 hay muchos m\'as par\'ametros que\\ datos, y aun as\'i no sobreajusta};
 
 	\node[rectangle, rounded corners=3pt, draw=AccentGreen!60!black, thick,
 		fill=AccentGreen!8, minimum width=8cm, align=center, inner sep=5pt]
 		(c) at (3.3,-2.1)
-		{\textbf{Y sin embargo, funciona.}\\
+		{\textbf{¿Por qu\'e funciona el Aprendizaje Profundo?}\\
 		 \emph{O los datos, o los modelos, o los algoritmos ---}\\
-		 \emph{o los tres --- tienen alguna propiedad especial.}};
+		 \emph{o los tres --- tienen alguna propiedad special.}};
 
 	\draw[fl] (a) -- (c);
 	\draw[fl] (b) -- (c);
@@ -189,7 +189,7 @@ Esta clase no presenta resultados establecidos: presenta \textbf{preguntas abier
 	\item Ninguna de las dos cosas es obvia. Esta clase examina por qu\'e ocurren.
 \end{itemize}
 \vspace{0.2em}
-\idea{El t\'itulo del libro de Prince es \emph{Understanding Deep Learning}; el propio autor advierte que es en parte una broma, porque nadie entiende del todo por qu\'e esto funciona.}
+\idea{Falta investigaci\'on para entender por qu\'e el aprendizaje profundo funciona tan bien en la pr\'actica.}
 \end{frame}
 
 \begin{frame}
@@ -345,7 +345,7 @@ Keskar et al.\ (2017) ajustan bien con lotes de 5.000--6.000 im\'agenes, elimina
 \end{frame}
 
 \begin{frame}
-\frametitle{Sobreparametrización: un pajar de agujas}
+\frametitle{Sobreparametrización}
 \footnotesize % ajuste de densidad
 \begin{columns}[T]
 \begin{column}{6.4cm}
@@ -578,7 +578,7 @@ No hay ``valles aislados'': parece haber \textbf{una sola variedad conexa} de p\
 \end{frame}
 
 \begin{frame}
-\frametitle{Curvatura: puntos silla y la zona Ricitos de Oro}
+\frametitle{Curvatura}
 \footnotesize % ajuste de densidad
 \begin{columns}[c]
 \begin{column}{6.1cm}

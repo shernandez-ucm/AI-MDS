@@ -46,15 +46,15 @@
 
 % Vínculo explícito con la clase
 \newcommand{\enlace}[1]{\par\vspace{2pt}{\footnotesize\color{StanfordGray}%
-	$\hookrightarrow$\ \textit{Clase 1.4:} #1}}
+	$\hookrightarrow$\  #1}}
 
 \begin{document}
 
 % =====================================================================
 \begin{center}
 {\LARGE\bfseries\color{UCMNavy} Estudio de casos}\\[4pt]
-{\Large\bfseries ¿Por qué (no) funciona el aprendizaje profundo\\ en la detección de riesgo materno?}\\[10pt]
-{\normalsize MDS221 --- Inteligencia Artificial \quad$\bullet$\quad Unidad 1, clase 1.4}\\[2pt]
+{\Large\bfseries Aprendizaje profundo en la detección de riesgo materno}\\[10pt]
+{\normalsize MDS221 --- Inteligencia Artificial \quad$\bullet$\quad Unidad 1}\\[2pt]
 {\normalsize Mag\'ister en Data Science --- Universidad Cat\'olica del Maule}\\[2pt]
 {\small Sergio Hern\'andez, PhD \quad$\bullet$\quad \texttt{shernandez@ucm.cl}}
 \end{center}
@@ -64,15 +64,15 @@
 
 \noindent
 \begin{tabularx}{\textwidth}{@{}p{3.2cm}X@{}}
-\textbf{Modalidad} & Grupos de 2 o 3 estudiantes.\\
+\textbf{Modalidad} & Individual.\\
 \textbf{Dedicaci\'on} & Aproximadamente 12 horas de trabajo aut\'onomo.\\
-\textbf{Entregables} & Cuaderno reproducible \texttt{.ipynb} + informe en PDF (6--8 p\'aginas).\\
+\textbf{Entregables} & Notebook reproducible \texttt{.ipynb} + informe en PDF (6--8 p\'aginas).\\
 \textbf{Evaluaci\'on} & R\'ubrica de la secci\'on~\ref{sec:rubrica} (240 puntos, 60\,\% de exigencia).\\
 \end{tabularx}
 
 \vspace{0.8em}
 \begin{pregunta}
-\textbf{El caso en una frase.} Un art\'iculo publicado en \emph{Healthcare} (2025) compara seis clasificadores para predecir el nivel de riesgo de una embarazada a partir de seis signos vitales. El \textbf{bosque aleatorio alcanza 84{,}5\,\%} de exactitud; las \textbf{redes neuronales se quedan en 69\,\%}. La clase 1.4 sostiene que la sobreparametrizaci\'on y la profundidad son justamente lo que hace funcionar al aprendizaje profundo. \textbf{¿Por qu\'e aqu\'i pierde?}
+\textbf{El caso en una frase.} Un art\'iculo publicado en \emph{Healthcare} (2025) compara seis clasificadores para predecir el nivel de riesgo de una embarazada a partir de seis signos vitales. El \textbf{bosque aleatorio alcanza 84{,}5\,\%} de exactitud; las \textbf{redes neuronales se quedan en 69\,\%}. La sobreparametrizaci\'on y la profundidad son justamente lo que hace funcionar al aprendizaje profundo. \textbf{¿Por qu\'e aqu\'i pierde?}
 \end{pregunta}
 
 % =====================================================================
@@ -117,12 +117,12 @@ mhr = fetch\_ucirepo(id=863)\\
 X, y = mhr.data.features, mhr.data.targets
 }}
 
-\begin{aviso}
+\begin{comment}
 \textbf{Primera discrepancia, y es suya para resolver.} El art\'iculo declara \textbf{1014} instancias (1013 tras corregir dos frecuencias card\'iacas imposibles de 7\,lpm); la ficha actual de UCI reporta \textbf{1013}. Verifique cu\'antas filas trae su descarga, cu\'antas est\'an \textbf{duplicadas exactamente} y d\'ejelo documentado antes de entrenar nada. La cifra que obtenga condiciona todo lo que sigue.
-\end{aviso}
+\end{comment}
 
 % =====================================================================
-\section{El resultado que hay que explicar}
+\section{Linea Base}
 
 Los autores entrenan con validaci\'on cruzada de 10 pliegues y reportan:
 
@@ -144,7 +144,7 @@ M\'aquina de soporte vectorial    & 75{,}74\,\% & 76{,}30\,\% & 75{,}70\,\%\\
 
 \vspace{0.8em}
 \noindent
-Las dos arquitecturas neuronales quedan \textbf{\'ultimas entre los m\'etodos no triviales}, quince puntos por debajo del bosque. Ese es el hecho a explicar. La clase 1.4 entrega el vocabulario para hacerlo: sobreparametrizaci\'on, umbral de interpolaci\'on, doble descenso, planitud del m\'inimo, sesgo inductivo, billete de loter\'ia. El trabajo consiste en \textbf{usar ese vocabulario como instrumento de medici\'on}, no como decorado.
+Las dos arquitecturas neuronales quedan \textbf{\'ultimas entre los m\'etodos no triviales}, quince puntos por debajo del bosque. Ese es el hecho a explicar. Los mecanismos que explican el desempeño del Aprendizaje Profundo son : sobreparametrizaci\'on, umbral de interpolaci\'on, doble descenso, planitud del m\'inimo, sesgo inductivo, billete de loter\'ia. El trabajo consiste en \textbf{usar ese vocabulario como instrumento de medici\'on}, no como decorado.
 
 \begin{pregunta}
 \textbf{Pregunta central del caso.} ¿El fracaso relativo de las redes neuronales en este problema es (a) un problema de \emph{capacidad} --- faltan par\'ametros o datos ---, (b) un problema de \emph{optimizaci\'on} --- la soluci\'on existe pero el entrenamiento no la encuentra ---, o (c) un problema de \emph{sesgo inductivo} --- la arquitectura no encaja con la estructura del dato? Su informe debe defender una respuesta \textbf{con evidencia propia}, no con citas.
@@ -161,47 +161,61 @@ Cada tarea indica con qu\'e parte de la clase 1.4 se conecta. Todos los experime
 	\item Cuente las filas duplicadas exactas. Reeval\'ue asegurando que \textbf{ning\'un duplicado quede a ambos lados} de la partici\'on. ¿Cu\'anta exactitud se pierde? Discuta qu\'e parte del 84{,}5\,\% original era memorizaci\'on medida sobre s\'i misma.
 	\item Con clases 406/336/272, argumente por qu\'e la exactitud sola es un mal resumen. Reporte matriz de confusi\'on y F1 por clase.
 \end{enumerate}
-\enlace{secci\'on ``¿Son los datos?'' --- la advertencia de Zhang et al.\ es que una red memoriza \emph{cualquier} conjunto finito; su validaci\'on tiene que estar dise\~nada para notar la diferencia.}
+%\enlace{secci\'on ``¿Son los datos?'' --- la advertencia de Zhang et al.\ es que una red memoriza \emph{cualquier} conjunto finito; su validaci\'on tiene que estar dise\~nada para notar la diferencia.}
 
-\subsection*{T2 --- ¿Puede la red memorizar este problema?}
+\subsection*{T2 --- Generalización y sobreparametrización}
 \begin{enumerate}
 	\item Permute \texttt{RiskLevel} al azar, destruyendo toda relaci\'on con las variables. Entrene MLP de ancho creciente hasta llevar el error de \textbf{entrenamiento} a cero.
 	\item Reporte el n\'umero m\'inimo de par\'ametros necesario y comp\'arelo con $n \approx 1000$ ejemplos. ¿Cu\'antas veces sobreparametrizado quedó el modelo?
 	\item Repita con las etiquetas reales. ¿Necesita m\'as o menos capacidad? ¿Qu\'e dice eso sobre la ``simplicidad'' de la funci\'on subyacente?
 \end{enumerate}
-\enlace{r\'eplica en miniatura del experimento de Zhang et al.\ (2017) que aparece en la l\'amina de p\'ixeles y etiquetas aleatorias.}
+%\enlace{r\'eplica en miniatura del experimento de Zhang et al.\ (2017) que aparece en la l\'amina de p\'ixeles y etiquetas %aleatorias.}
 
-\subsection*{T3 --- Barrido de capacidad: ¿aparece el doble descenso?}
+\subsection*{T3 --- Dilema Sesgo-Varianza}
 \begin{enumerate}
 	\item MLP de una capa oculta con ancho en escala logar\'itmica, de 2 a 2048 unidades. Grafique error de entrenamiento y de prueba contra n\'umero de par\'ametros.
 	\item Marque el \textbf{umbral de interpolaci\'on} (par\'ametros $\approx$ datos). ¿Observa el pico y el segundo descenso, o solo la curva en U cl\'asica?
-	\item Si \textbf{no} aparece el doble descenso, no lo fuerce: explique qu\'e condiciones de la clase 1.4 no se cumplen aqu\'i (tama\~no de $n$, ruido de etiqueta, regularizaci\'on impl\'icita del optimizador).
+	\item Qu\'e condiciones no se cumplen aqu\'i (tama\~no de $n$, ruido de etiqueta, regularizaci\'on impl\'icita del optimizador).
 \end{enumerate}
-\enlace{l\'amina ``Sobreparametrizaci\'on y doble descenso''. Recuerde: la curva en U cl\'asica no est\'a mal, est\'a \emph{incompleta} --- pero solo cuando se llega al r\'egimen moderno.}
+%\enlace{l\'amina ``Sobreparametrizaci\'on y doble descenso''. La curva en U cl\'asica no est\'a mal, est\'a \emph{incompleta} %--- pero solo cuando se llega al r\'egimen moderno.}
 
-\subsection*{T4 --- Razón lote/tasa y planitud del mínimo}
+\subsection*{T4 --- Hiperpar\'ametros}
 \begin{enumerate}
 	\item Grilla de tama\~no de lote $\in \{8, 32, 128, 512\}$ por tasa de aprendizaje $\in \{10^{-3}, 10^{-2}, 10^{-1}\}$. Grafique el error de prueba contra la \textbf{raz\'on lote/tasa}.
 	\item Estime la planitud de cada m\'inimo: p\'erdida m\'axima en una vecindad $\lVert\bm\delta\rVert = \varepsilon$ alrededor de los par\'ametros finales (criterio de Keskar), con al menos 20 direcciones aleatorias.
 	\item ¿Correlacionan planitud y generalizaci\'on \textbf{en este problema}? Contraste su resultado con la advertencia de Dinh et al.\ sobre reparametrizaciones triviales de ReLU.
 \end{enumerate}
-\enlace{l\'aminas ``El algoritmo elige a cu\'al m\'inimo llegar'' y ``Planitud del m\'inimo''.}
+%\enlace{l\'aminas ``El algoritmo elige a cu\'al m\'inimo llegar'' y ``Planitud del m\'inimo''.}
 
-\subsection*{T5 --- Billete de lotería a escala pequeña}
-\begin{enumerate}
-	\item Entrene su mejor MLP y guarde la inicializaci\'on. Pode por magnitud hasta conservar el 20\,\%, 10\,\% y 5\,\% de los pesos.
-	\item Reentrene dos veces cada subred: (a) desde \textbf{la misma} inicializaci\'on original, (b) desde una inicializaci\'on aleatoria nueva.
-	\item ¿Se reproduce el resultado de Frankle \& Carbin a esta escala? Si la diferencia entre (a) y (b) desaparece, discuta si es porque el modelo es demasiado peque\~no para contener ``billetes ganadores''.
-\end{enumerate}
-\enlace{l\'aminas ``Activaci\'on, inicializaci\'on y profundidad'' y ``Poda''.}
-
-\subsection*{T6 --- Sesgo inductivo: por qué gana el bosque}
+\subsection*{T5 --- Sesgo inductivo}
 \begin{enumerate}
 	\item Formule una hip\'otesis concreta sobre por qu\'e un \emph{ensemble} de \'arboles supera a una red en datos tabulares peque\~nos, y dise\~ne \textbf{un experimento que pueda refutarla}.
 	\item Contraprueba obligatoria: intente cerrar la brecha con al menos dos intervenciones (normalizaci\'on por variable, regularizaci\'on fuerte, \emph{early stopping}, \emph{embeddings} de variables discretizadas, \emph{ensemble} de redes). Reporte cu\'anto se acorta.
 	\item Relacione su conclusi\'on con las tres explicaciones que la clase da para la profundidad: complejidad de la funci\'on, tratabilidad del entrenamiento y sesgo inductivo.
 \end{enumerate}
-\enlace{l\'aminas ``Arquitectura: el sesgo inductivo'' y ``Tres explicaciones posibles para la profundidad''.}
+%\enlace{l\'aminas ``Arquitectura: el sesgo inductivo'' y ``Tres explicaciones posibles para la profundidad''.}
+
+\subsection*{T6 --- Modelos Fundacionales}
+\begin{enumerate}
+	\item Utilice el modelo fundacional TabFM\footnote{\url{https://github.com/google-research/tabfm/blob/main/examples/tabarena_classification_example.py}} para resolver el problema de clasficación usando promediado de logits (logit averaging).
+	\item Utilice el modelo fundacional TabFM para resolver el problema de clasficación usando feature engineering (feature crosses / SVD features + NNLS-weighted blending + probability calibration).
+	\item Compare los resultados de ambos enfoques con respecto a las m\'etricas de evaluaci\'on ROC, AUC y log-loss con respecto al mejor MLP obtenido.
+\end{enumerate}
+
+\vspace{0.3em}
+\noindent\colorbox{LightGray}{\parbox{\dimexpr\textwidth-2\fboxsep}{\ttfamily\small
+model = tabfm.tabfm\_v1\_0\_0\_pytorch.load(model\_type="classification")\\
+results = \{\}\\
+  results["default"] = \_evaluate(\\
+      tabfm.TabFMClassifier(model=model, random\_state=SEED),\\
+      x\_train, y\_train, x\_test, y\_test,\\
+  )\\
+  results["ensemble"] = \_evaluate(\\
+      tabfm.TabFMClassifier.ensemble(model=model, random\_state=SEED),\\
+      x\_train, y\_train, x\_test, y\_test,\\
+  )\\
+}}
+%\enlace{l\'aminas ``Arquitectura: el sesgo inductivo'' y ``Tres explicaciones posibles para la profundidad''.}
 
 \subsection*{T7 --- Lectura clínica: el error que no cuesta lo mismo}
 \begin{enumerate}
@@ -210,14 +224,14 @@ Cada tarea indica con qu\'e parte de la clase 1.4 se conecta. Todos los experime
 	\item Robustez: perturbe las se\~nales $\pm 5\,\%$ (error plausible de un tensi\'ometro o un term\'ometro) y mida la ca\'ida de desempe\~no de cada modelo. Discuta la analog\'ia con los ejemplos adversarios de la clase: ¿qu\'e tan lejos de la variedad de datos hay que ir para romper la predicci\'on?
 	\item Los datos provienen de centros de salud de Bangladesh mediante sensores IoT. Discuta qu\'e supuestos habr\'ia que revisar antes de siquiera considerar un despliegue en la red asistencial chilena.
 \end{enumerate}
-\enlace{l\'aminas ``Salir de la variedad de datos'' y ``Lo que todav\'ia no sabemos''.}
+%\enlace{l\'aminas ``Salir de la variedad de datos'' y ``Lo que todav\'ia no sabemos''.}
 
 % =====================================================================
 \section{Entregables}
 
 \begin{entrega}
 \begin{enumerate}[leftmargin=1.6em]
-	\item \textbf{Cuaderno reproducible} (\texttt{.ipynb}). Debe correr de principio a fin sin intervenci\'on manual, con semillas fijadas y la descarga del dato incluida. Un cuaderno que no corre se eval\'ua como si no se hubiera entregado.
+	\item \textbf{Notebook reproducible} (\texttt{.ipynb}). Debe correr de principio a fin sin intervenci\'on manual, con semillas fijadas y la descarga del dato incluida. Un cuaderno que no corre se eval\'ua como si no se hubiera entregado.
 	\item \textbf{Informe} en PDF, 6 a 8 p\'aginas, con esta estructura m\'inima:
 	\begin{itemize}
 		\item Auditor\'ia del dato y l\'inea base corregida (T1).
@@ -235,7 +249,7 @@ Cada tarea indica con qu\'e parte de la clase 1.4 se conecta. Todos los experime
 \textbf{Sobre el uso de asistentes de IA.} Est\'a permitido y se espera que lo declaren: incluyan un p\'arrafo indicando qu\'e herramienta usaron y para qu\'e. Lo que se eval\'ua es el criterio con que interpretan los resultados, y eso no se delega. Un informe con conclusiones que el propio cuaderno no respalda se penaliza en \emph{Precisi\'on y rigor}, independientemente de qui\'en lo haya escrito.
 
 \begin{aviso}
-\textbf{Un resultado negativo bien establecido vale tanto como uno positivo.} Si tras un barrido honesto la red sigue perdiendo contra el bosque, esa \emph{es} la conclusi\'on: el cap\'itulo 20 sostiene que la sobreparametrizaci\'on ayuda \textbf{a la escala y complejidad de los conjuntos que se usan hoy en visi\'on y lenguaje}, no que una red gane siempre. Lo que no se acepta es afirmar sin medir.
+\textbf{Un resultado negativo bien establecido vale tanto como uno positivo.} Si tras un barrido honesto la red sigue perdiendo contra el bosque, esa \emph{es} la conclusi\'on: la sobreparametrizaci\'on ayuda \textbf{a la escala y complejidad de los conjuntos que se usan hoy en visi\'on y lenguaje}, no que una red gane siempre.
 \end{aviso}
 
 % =====================================================================
