@@ -34,13 +34,3 @@ Para instalar el entorno y las dependencias necesarias:
    ```
 
 # Contenidos
-
-
-## Agradecimientos
-
-* **✍️ Primary Author:** [Dmitry Soshnikov](http://soshnikov.com), PhD
-* **🔥 Editor:** [Jen Looper](https://twitter.com/jenlooper), PhD
-* **🎨 Sketchnote illustrator:** [Tomomi Imura](https://twitter.com/girlie_mac)
-* **✅ Quiz Creator:** [Lateefah Bello](https://github.com/CinnamonXI), [MLSA](https://studentambassadors.microsoft.com/)
-* **🙏 Core Contributors:** [Evgenii Pishchik](https://github.com/Pe4enIks)
-
