@@ -1,0 +1,387 @@
+\documentclass[border=8pt, multi, tikz]{standalone}
+\usepackage{import}
+\subimport{layers/}{init}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{3d} %for including external image
+
+% SSD300 (Liu et al., 2016): VGG-16 truncado (13 conv, sin FC) + capas adicionales
+% multi-escala. Cada feature map fuente pasa por una conv 3x3 que predice, por
+% anchor, (x, y, w, h) + 20 clases:
+%   conv4_3   38x38x512    4 anchors -> 38x38x96
+%   conv7     19x19x1024   6 anchors -> 19x19x144
+%   conv8_2   10x10x512    6 anchors -> 10x10x144
+%   conv9_2    5x5x256     6 anchors ->  5x5x144
+%   conv10_2   3x3x256     4 anchors ->  3x3x96
+%   conv11_2   1x1x256     4 anchors ->  1x1x96
+% Total: 38^2*4 + 19^2*6 + 10^2*6 + 5^2*6 + 3^2*4 + 1*4 = 8732 cajas.
+
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\UnpoolColor{rgb:blue,2;green,1;black,0.3}
+\def\FcColor{rgb:blue,2;green,5;white,5}
+\def\FcReluColor{blue,2;green,5;;white,4}
+\def\SoftmaxColor{rgb:magenta,5;black,7}
+\def\RegColor{rgb:blue,5;black,3}
+\def\ExtraColor{rgb:green,3;blue,1;white,4}
+
+
+\newcommand{\copymidarrow}{\tikz \draw[-Stealth,line width=0.8mm,draw={rgb:blue,4;red,1;green,1;black,3}] (-0.3,0) -- ++(0.3,0);}
+
+\begin{document}
+\begin{tikzpicture}
+\tikzstyle{connection}=[ultra thick,every node/.style={sloped,allow upside down},draw=\edgecolor,opacity=0.7]
+\tikzstyle{copyconnection}=[ultra thick,every node/.style={sloped,allow upside down},draw={rgb:blue,4;red,1;green,1;black,3},opacity=0.7]
+\tikzstyle{headconnection}=[ultra thick,draw=\edgecolor,opacity=0.7,-Stealth]
+\tikzstyle{headlabel}=[font=\normalsize, anchor=west]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. Imagen de entrada
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\fill[black!6] (-10,-3.5) rectangle (-3,3.5);
+\draw[thick, black!60] (-10,-3.5) rectangle (-3,3.5);
+\draw[line width=1mm, red]            (-9.4,-2.9) rectangle (-6.6,0.7);
+\draw[line width=1mm, green!50!black] (-6.3,-1.2) rectangle (-3.5,2.8);
+\draw[line width=1mm, orange]         (-9.0,1.6) rectangle (-8.2,2.6);
+\node[font=\Large\bfseries, align=center] at (-6.5,5.2)
+    {Imagen de entrada\\[2pt]\normalsize 300$\times$300$\times$3 RGB};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. Backbone: VGG-16 truncado (13 conv 3x3, stride 1; max pool stride 2)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(0,0,0)}] at (0,0,0)
+    {Box={
+        name=conv1,
+        caption=conv1,
+        xlabel={{"","64"}},
+        zlabel=300,
+        fill=\ConvColor,
+        height=30,
+        width={1.5,1.5},
+        depth=30
+        }
+    };
+
+\draw [connection] (-3,0) -- node {\midarrow} (conv1-west);
+
+\pic[shift={ (0,0,0) }] at (conv1-east)
+    {Box={
+        name=pool1,
+        caption= ,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=20,
+        width=1,
+        depth=20
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (pool1-east)
+    {Box={
+        name=conv2,
+        caption=conv2,
+        xlabel={{"","128"}},
+        zlabel=150,
+        fill=\ConvColor,
+        height=20,
+        width={2,2},
+        depth=20
+        }
+    };
+\draw [connection]  (pool1-east)    -- node {\midarrow} (conv2-west);
+
+\pic[shift={ (0,0,0) }] at (conv2-east)
+    {Box={
+        name=pool2,
+        caption= ,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=13,
+        width=1,
+        depth=13
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (pool2-east)
+    {Box={
+        name=conv3,
+        caption=conv3,
+        xlabel={{"","","256"}},
+        zlabel=75,
+        fill=\ConvColor,
+        height=13,
+        width={2,2,2},
+        depth=13
+        }
+    };
+\draw [connection]  (pool2-east)    -- node {\midarrow} (conv3-west);
+
+\pic[shift={ (0,0,0) }] at (conv3-east)
+    {Box={
+        name=pool3,
+        caption= ,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=8,
+        width=1,
+        depth=8
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (pool3-east)
+    {Box={
+        name=conv4,
+        caption=conv4\_3,
+        xlabel={{"","","512"}},
+        zlabel=38,
+        fill=\ConvReluColor,
+        height=8,
+        width={2.5,2.5,2.5},
+        depth=8
+        }
+    };
+\draw [connection]  (pool3-east)    -- node {\midarrow} (conv4-west);
+
+\pic[shift={ (0,0,0) }] at (conv4-east)
+    {Box={
+        name=pool4,
+        caption= ,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=5,
+        width=1,
+        depth=5
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (pool4-east)
+    {Box={
+        name=conv5,
+        caption=conv5,
+        xlabel={{"","","512"}},
+        zlabel=19,
+        fill=\ConvColor,
+        height=5,
+        width={2.5,2.5,2.5},
+        depth=5
+        }
+    };
+\draw [connection]  (pool4-east)    -- node {\midarrow} (conv5-west);
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick]
+    ($(conv1-west)+(-2.2,-6.5)$) -- ($(conv5-east)+(0,-6.5)$)
+    node[midway, below=12pt, font=\Large\bfseries, align=center]
+    {Backbone: VGG-16 truncado\\[2pt]\normalsize 13 conv 3$\times$3 (stride 1) + max pool stride 2, sin capas FC};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. Capas adicionales multi-escala
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(1.5,0,0)}] at (conv5-east)
+    {Box={
+        name=conv6,
+        caption=conv6,
+        xlabel={{1024, }},
+        zlabel=19,
+        fill=\ExtraColor,
+        height=5,
+        width=4.5,
+        depth=5
+        }
+    };
+\draw [connection]  (conv5-east)    -- node {\midarrow} (conv6-west);
+
+\pic[shift={(1.2,0,0)}] at (conv6-east)
+    {Box={
+        name=conv7,
+        caption=conv7,
+        xlabel={{1024, }},
+        zlabel=19,
+        fill=\ConvReluColor,
+        height=5,
+        width=4.5,
+        depth=5
+        }
+    };
+\draw [connection]  (conv6-east)    -- node {\midarrow} (conv7-west);
+
+\pic[shift={(2.5,0,0)}] at (conv7-east)
+    {Box={
+        name=conv8,
+        caption=conv8\_2,
+        xlabel={{"","512"}},
+        zlabel=10,
+        fill=\ConvReluColor,
+        height=3,
+        width={1.5,3.5},
+        depth=3
+        }
+    };
+\draw [connection]  (conv7-east)    -- node {\midarrow} (conv8-west);
+
+\pic[shift={(2.5,0,0)}] at (conv8-east)
+    {Box={
+        name=conv9,
+        caption=conv9\_2,
+        xlabel={{"","256"}},
+        zlabel=5,
+        fill=\ConvReluColor,
+        height=2,
+        width={1,2.5},
+        depth=2
+        }
+    };
+\draw [connection]  (conv8-east)    -- node {\midarrow} (conv9-west);
+
+\pic[shift={(2.5,0,0)}] at (conv9-east)
+    {Box={
+        name=conv10,
+        caption=conv10\_2,
+        xlabel={{"","256"}},
+        zlabel=3,
+        fill=\ConvReluColor,
+        height=1.4,
+        width={1,2.5},
+        depth=1.4
+        }
+    };
+\draw [connection]  (conv9-east)    -- node {\midarrow} (conv10-west);
+
+\pic[shift={(2.5,0,0)}] at (conv10-east)
+    {Box={
+        name=conv11,
+        caption=conv11\_2,
+        xlabel={{"","256"}},
+        zlabel=1,
+        fill=\ConvReluColor,
+        height=0.8,
+        width={1,2.5},
+        depth=0.8
+        }
+    };
+\draw [connection]  (conv10-east)    -- node {\midarrow} (conv11-west);
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick]
+    ($(conv6-west)+(-1,-6.5)$) -- ($(conv11-east)+(0.5,-6.5)$)
+    node[midway, below=12pt, font=\Large\bfseries, align=center]
+    {Capas adicionales multi-escala\\[2pt]\normalsize conv6--7: 1024 filtros; luego pares 1$\times$1 + 3$\times$3 que reducen la resoluci\'on};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. Heads de detecci\'on: conv 3x3 sobre cada feature map fuente
+%    salida m x m x (#anchors x (4 + 20 clases))
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(0,0,0)}] at ($(conv4-west)+(0.5,9)$)
+    {Box={
+        name=h1,
+        caption= ,
+        xlabel={{96, }},
+        zlabel=38,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=8,
+        width=2,
+        depth=8
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(conv7-west)+(0,9)$)
+    {Box={
+        name=h2,
+        caption= ,
+        xlabel={{144, }},
+        zlabel=19,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=5,
+        width=3,
+        depth=5
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(conv8-west)+(0,9)$)
+    {Box={
+        name=h3,
+        caption= ,
+        xlabel={{144, }},
+        zlabel=10,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=3,
+        width=3,
+        depth=3
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(conv9-west)+(0,9)$)
+    {Box={
+        name=h4,
+        caption= ,
+        xlabel={{144, }},
+        zlabel=5,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=2,
+        width=3,
+        depth=2
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(conv10-west)+(0,9)$)
+    {Box={
+        name=h5,
+        caption= ,
+        xlabel={{96, }},
+        zlabel=3,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=1.4,
+        width=2,
+        depth=1.4
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(conv11-west)+(0,9)$)
+    {Box={
+        name=h6,
+        caption= ,
+        xlabel={{96, }},
+        zlabel=1,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=0.8,
+        width=2,
+        depth=0.8
+        }
+    };
+
+% conv 3x3 desde cada feature map fuente hacia su head
+\foreach \src/\h in {conv4/h1, conv7/h2, conv8/h3, conv9/h4, conv10/h5, conv11/h6}{
+    \draw [headconnection] (\src-north) -- node[pos=0.5, fill=white, inner sep=1pt, font=\small] {3$\times$3} (\src-north |- \h-south);
+}
+
+\node[headlabel] at ($(h1-east)+(0.3,0)$) {4 anchors};
+\node[headlabel] at ($(h2-east)+(0.3,0)$) {6 anchors};
+\node[headlabel] at ($(h3-east)+(0.3,0)$) {6 anchors};
+\node[headlabel] at ($(h4-east)+(0.3,0)$) {6 anchors};
+\node[headlabel] at ($(h5-east)+(0.3,0)$) {4 anchors};
+\node[headlabel] at ($(h6-east)+(0.3,0)$) {4 anchors};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 5. Detecciones: todas las predicciones se agrupan y se filtran con NMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\coordinate (bus) at ($(h1-north)+(0,2.5)$);
+\node[draw, thick, rounded corners, fill=white, align=center, font=\large]
+    (dets) at ($(h6-east)+(4.5,0)$)
+    {\textbf{Detecciones}\\ 8732 cajas};
+\node[draw, thick, rounded corners, fill=white, align=center, font=\large, right=1.2 of dets]
+    (nms) {\textbf{NMS}};
+
+\foreach \h in {h1, h2, h3, h4, h5, h6}{
+    \draw [ultra thick, draw=\edgecolor, opacity=0.7] (\h-north) -- (\h-north |- bus);
+}
+\draw [ultra thick, draw=\edgecolor, opacity=0.7] (h1-north |- bus) -- (dets.north |- bus);
+\draw [headconnection] (dets.north |- bus) -- (dets.north);
+\draw [headconnection] (dets.east) -- (nms.west);
+
+\node[font=\Large\bfseries, align=center] at ($(h1-west)!0.5!(h6-east)+(0,5.2)$)
+    {Heads de detecci\'on multi-escala\\[2pt]\normalsize
+     conv 3$\times$3 por feature map: $m \times m \times (\#\mathrm{anchors} \times (4 + 20\ \mathrm{clases}))$};
+
+\end{tikzpicture}
+\end{document}

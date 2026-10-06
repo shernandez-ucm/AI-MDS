@@ -1,0 +1,277 @@
+\documentclass[border=8pt, multi, tikz]{standalone}
+\usepackage{import}
+\subimport{layers/}{init}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{3d} %for including external image
+
+% Faster R-CNN (Ren et al., 2015): backbone ResNet-50/101 -> feature map H/32 x W/32
+% -> RPN (conv 3x3 512, ramas 1x1 cls/reg, k = 9 anchors, NMS 0.7) -> RoI Align 7x7x512
+% -> FC6/FC7 (1024) -> clasificaci\'on (#clases) + regresi\'on (4 x #clases).
+
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\UnpoolColor{rgb:blue,2;green,1;black,0.3}
+\def\FcColor{rgb:blue,2;green,5;white,5}
+\def\FcReluColor{blue,2;green,5;;white,4}
+\def\SoftmaxColor{rgb:magenta,5;black,7}
+\def\RegColor{rgb:blue,5;black,3}
+\def\RpnColor{rgb:green,3;blue,1;white,4}
+
+
+\newcommand{\copymidarrow}{\tikz \draw[-Stealth,line width=0.8mm,draw={rgb:blue,4;red,1;green,1;black,3}] (-0.3,0) -- ++(0.3,0);}
+
+\begin{document}
+\begin{tikzpicture}
+\tikzstyle{connection}=[ultra thick,every node/.style={sloped,allow upside down},draw=\edgecolor,opacity=0.7]
+\tikzstyle{copyconnection}=[ultra thick,every node/.style={sloped,allow upside down},draw={rgb:blue,4;red,1;green,1;black,3},opacity=0.7]
+\tikzstyle{headconnection}=[ultra thick,draw=\edgecolor,opacity=0.7,-Stealth]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. Imagen de entrada (una sola pasada por la red, no una por regi\'on)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\fill[black!6] (-10,-3.5) rectangle (-3,3.5);
+\draw[thick, black!60] (-10,-3.5) rectangle (-3,3.5);
+\draw[line width=1mm, red]            (-9.2,-2.8) rectangle (-6.8,0.8);
+\draw[line width=1mm, green!50!black] (-6.2,-0.6) rectangle (-3.6,2.8);
+\node[font=\Large\bfseries, align=center] at (-6.5,5.2)
+    {Imagen de entrada\\[2pt]\normalsize 1000$\times$1000, una sola pasada};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. Backbone ResNet-50/101: feature map compartido H/32 x W/32
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(0,0,0)}] at (0,0,0)
+    {Box={
+        name=conv1,
+        caption=conv1,
+        xlabel={{64, }},
+        zlabel=500,
+        fill=\ConvColor,
+        height=30,
+        width=3.5,
+        depth=30
+        }
+    };
+
+\draw [connection] (-3,0) -- node {\midarrow} (conv1-west);
+
+\pic[shift={(1,0,0)}] at (conv1-east)
+    {Box={
+        name=layer1,
+        caption=layer1,
+        xlabel={{256, }},
+        zlabel=250,
+        fill=\ConvColor,
+        height=22,
+        width=4,
+        depth=22
+        }
+    };
+
+\draw [connection]  (conv1-east)    -- node {\midarrow} (layer1-west);
+
+\pic[shift={(1,0,0)}] at (layer1-east)
+    {Box={
+        name=layer2,
+        caption=layer2,
+        xlabel={{512, }},
+        zlabel=125,
+        fill=\ConvColor,
+        height=15,
+        width=6,
+        depth=15
+        }
+    };
+
+\draw [connection]  (layer1-east)    -- node {\midarrow} (layer2-west);
+
+\pic[shift={(1,0,0)}] at (layer2-east)
+    {Box={
+        name=layer3,
+        caption=layer3,
+        xlabel={{1024, }},
+        zlabel=63,
+        fill=\ConvColor,
+        height=10,
+        width=8,
+        depth=10
+        }
+    };
+
+\draw [connection]  (layer2-east)    -- node {\midarrow} (layer3-west);
+
+\pic[shift={(1,0,0)}] at (layer3-east)
+    {Box={
+        name=layer4,
+        caption=layer4,
+        xlabel={{2048, }},
+        zlabel=32,
+        fill=\ConvReluColor,
+        height=6.4,
+        width=10,
+        depth=6.4
+        }
+    };
+
+\draw [connection]  (layer3-east)    -- node {\midarrow} (layer4-west);
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick]
+    ($(conv1-west)+(-1.5,-6.8)$) -- ($(layer4-east)+(0,-6.8)$)
+    node[midway, below=12pt, font=\Large\bfseries, align=center]
+    {Backbone ResNet-50/101\\[2pt]\normalsize feature map $H/32 \times W/32$};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. Region Proposal Network sobre el feature map
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(2.5,7,0)}] at (layer4-east)
+    {Box={
+        name=rpn,
+        caption=conv 3$\times$3,
+        xlabel={{512, }},
+        zlabel=32,
+        fill=\RpnColor,
+        height=6.4,
+        width=5,
+        depth=6.4
+        }
+    };
+
+\draw [headconnection] (layer4-east) -- ++(1.2,0) |- (rpn-west);
+
+\pic[shift={(2.5,2,0)}] at (rpn-east)
+    {Box={
+        name=rpncls,
+        caption=cls,
+        xlabel={{18, }},
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=6.4,
+        width=1.5,
+        depth=6.4
+        }
+    };
+
+\pic[shift={(2.5,-2,0)}] at (rpn-east)
+    {Box={
+        name=rpnreg,
+        caption=reg,
+        xlabel={{36, }},
+        fill=\RegColor,
+        opacity=0.8,
+        height=6.4,
+        width=2.5,
+        depth=6.4
+        }
+    };
+
+\draw [headconnection] (rpn-east) -- ++(1,0) |- (rpncls-west);
+\draw [headconnection] (rpn-east) -- ++(1,0) |- (rpnreg-west);
+
+\node[font=\Large\bfseries, align=center] at ($(rpn-east)+(2.3,4.4)$)
+    {Region Proposal Network\\[2pt]\normalsize $k = 9$ anchors por p\'ixel (3 escalas $\times$ 3 ratios)};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. RoI Align: recorta cada propuesta del feature map compartido
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(13,0,0)}] at (layer4-east)
+    {Box={
+        name=roi,
+        caption=RoI Align,
+        xlabel={{512, }},
+        zlabel=7,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=1.4,
+        width=5,
+        depth=1.4
+        }
+    };
+
+\draw [connection] (layer4-east) -- node {\midarrow} (roi-west);
+\node[below=6pt, font=\large, align=center] at ($(layer4-east)!0.55!(roi-west)$)
+    {feature map compartido\\ (todas las propuestas)};
+
+\node[draw, thick, rounded corners, fill=white, align=center, font=\large]
+    (props) at (roi-north |- rpn-east)
+    {\textbf{Propuestas}\\ NMS (IoU 0.7)};
+
+\draw [headconnection] (rpncls-east) -- ++(0.8,0) |- ([yshift=4pt]props.west);
+\draw [headconnection] (rpnreg-east) -- ++(0.8,0) |- ([yshift=-4pt]props.west);
+\draw [headconnection, draw=red!80!black] (props.south) -- (roi-north);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 5. Head de detecci\'on: FC6-FC7 y ramas de clasificaci\'on / regresi\'on
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(2,0,0)}] at (roi-east)
+    {Box={
+        name=fc6,
+        caption=fc6,
+        xlabel={{1, }},
+        zlabel=1024,
+        fill=\FcColor,
+        height=1,
+        width=1,
+        depth=20.48
+        }
+    };
+
+\draw [connection]  (roi-east)    -- node {\midarrow} (fc6-west);
+
+\pic[shift={(2,0,0)}] at (fc6-east)
+    {Box={
+        name=fc7,
+        caption=fc7,
+        xlabel={{1, }},
+        zlabel=1024,
+        fill=\FcColor,
+        height=1,
+        width=1,
+        depth=20.48
+        }
+    };
+
+\draw [connection]  (fc6-east)    -- node {\midarrow} (fc7-west);
+
+\pic[shift={(4,3,0)}] at (fc7-east)
+    {Box={
+        name=cls,
+        caption=cls,
+        zlabel=C,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=3,
+        width=1.5,
+        depth=12
+        }
+    };
+
+\pic[shift={(4,-3,0)}] at (fc7-east)
+    {Box={
+        name=reg,
+        caption=bbox reg,
+        zlabel=4C,
+        fill=\RegColor,
+        opacity=0.8,
+        height=3,
+        width=1.5,
+        depth=12
+        }
+    };
+
+\draw [headconnection] (fc7-east) -- ++(1.5,0) |- (cls-west);
+\draw [headconnection] (fc7-east) -- ++(1.5,0) |- (reg-west);
+
+\node[anchor=west, align=left, font=\large] at ($(cls-east)+(0.8,0)$)
+    {clase ($C$ = \#clases)};
+\node[anchor=west, align=left, font=\large] at ($(reg-east)+(0.8,0)$)
+    {$(\Delta x, \Delta y, \Delta w, \Delta h)$\\ por clase};
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick]
+    ($(roi-west)+(0,-5.5)$) -- ($(reg-east)+(0,-2.5)$)
+    node[midway, below=12pt, font=\Large\bfseries, align=center]
+    {Head de detecci\'on\\[2pt]\normalsize p\'erdida multi-tarea $L_{cls} + \lambda L_{reg}$};
+
+\end{tikzpicture}
+\end{document}

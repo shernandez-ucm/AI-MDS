@@ -1,0 +1,383 @@
+\documentclass[border=8pt, multi, tikz]{standalone}
+\usepackage{import}
+\subimport{layers/}{init}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{3d} %for including external image
+
+% YOLOv5 (Ultralytics, 2020), seg\'un Terven et al., "A Comprehensive Review of
+% YOLO Architectures in Computer Vision" (arXiv:2304.00501), Fig. 13 (YOLOv5l):
+% backbone CSPDarknet53 modificado (Stem + 4 etapas Conv/2 + C3, SPPF),
+% neck CSP-PAN (FPN top-down + PAN bottom-up), head tipo YOLOv3 en 3 escalas.
+% Todas las convoluciones: Conv + BN + SiLU. Entrada 640x640.
+%   Stem      Conv 6x6/2, 64                     -> 320
+%   etapa 2   Conv 3x3/2, 128  + C3 x3           -> 160
+%   etapa 3   Conv 3x3/2, 256  + C3 x6           ->  80   (P3, H/8)
+%   etapa 4   Conv 3x3/2, 512  + C3 x9           ->  40   (P4, H/16)
+%   etapa 5   Conv 3x3/2, 1024 + C3 x3 + SPPF    ->  20   (P5, H/32)
+%   neck      Conv 1x1 512 -> up -> concat P4 -> C3 512 -> Conv 1x1 256 -> up
+%             -> concat P3 -> C3 256 (salida P3)
+%             -> Conv 3x3/2 -> concat -> C3 512 (salida P4)
+%             -> Conv 3x3/2 -> concat -> C3 1024 (salida P5)
+%   head      Conv 1x1 por escala: 3 anchors x (x, y, w, h, conf + 80 clases) = 255
+
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\UnpoolColor{rgb:blue,2;green,1;black,0.3}
+\def\FcColor{rgb:blue,2;green,5;white,5}
+\def\FcReluColor{blue,2;green,5;;white,4}
+\def\SoftmaxColor{rgb:magenta,5;black,7}
+\def\RegColor{rgb:blue,5;black,3}
+\def\CspColor{rgb:green,3;blue,1;white,4}
+
+
+\newcommand{\copymidarrow}{\tikz \draw[-Stealth,line width=0.8mm,draw={rgb:blue,4;red,1;green,1;black,3}] (-0.3,0) -- ++(0.3,0);}
+
+\begin{document}
+\begin{tikzpicture}
+\tikzstyle{connection}=[ultra thick,every node/.style={sloped,allow upside down},draw=\edgecolor,opacity=0.7]
+\tikzstyle{copyconnection}=[ultra thick,every node/.style={sloped,allow upside down},draw={rgb:blue,4;red,1;green,1;black,3},opacity=0.7]
+\tikzstyle{headconnection}=[ultra thick,draw=\edgecolor,opacity=0.7,-Stealth]
+\tikzstyle{concat}=[draw, thick, rounded corners, fill=white, font=\large, inner sep=3pt]
+\tikzstyle{op}=[font=\large, fill=white, inner sep=2pt]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. Imagen de entrada
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\fill[black!6] (-10,-3.5) rectangle (-3,3.5);
+\draw[thick, black!60] (-10,-3.5) rectangle (-3,3.5);
+\draw[line width=1mm, red]            (-9.4,-2.9) rectangle (-6.6,0.7);
+\draw[line width=1mm, green!50!black] (-6.3,-1.2) rectangle (-3.5,2.8);
+\draw[line width=1mm, orange]         (-9.0,1.6) rectangle (-8.2,2.6);
+\node[font=\Large\bfseries, align=center] at (-6.5,5.2)
+    {Imagen de entrada\\[2pt]\normalsize 640$\times$640$\times$3};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. Backbone: CSPDarknet53 modificado (5 etapas con stride 2)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(0,0,0)}] at (0,0,0)
+    {Box={
+        name=stem,
+        caption=Stem,
+        xlabel={{64, }},
+        zlabel=320,
+        fill=\ConvReluColor,
+        height=24,
+        width=2,
+        depth=24
+        }
+    };
+
+\draw [connection] (-3,0) -- node {\midarrow} (stem-west);
+
+% etapa 2: 160x160x128
+\pic[shift={(1.5,0,0)}] at (stem-east)
+    {Box={
+        name=conv2,
+        caption= ,
+        fill=\ConvReluColor,
+        height=18,
+        width=1,
+        depth=18
+        }
+    };
+\pic[shift={(0,0,0)}] at (conv2-east)
+    {Box={
+        name=c3a,
+        caption=C3$\times$3,
+        xlabel={{128, }},
+        zlabel=160,
+        fill=\CspColor,
+        height=18,
+        width=2.5,
+        depth=18
+        }
+    };
+\draw [connection]  (stem-east)    -- node {\midarrow} (conv2-west);
+
+% etapa 3: 80x80x256 (P3)
+\pic[shift={(1.5,0,0)}] at (c3a-east)
+    {Box={
+        name=conv3,
+        caption= ,
+        fill=\ConvReluColor,
+        height=12,
+        width=1,
+        depth=12
+        }
+    };
+\pic[shift={(0,0,0)}] at (conv3-east)
+    {Box={
+        name=c3b,
+        caption=C3$\times$6,
+        xlabel={{256, }},
+        zlabel=80,
+        fill=\CspColor,
+        height=12,
+        width=3.5,
+        depth=12
+        }
+    };
+\draw [connection]  (c3a-east)    -- node {\midarrow} (conv3-west);
+
+% etapa 4: 40x40x512 (P4)
+\pic[shift={(1.5,0,0)}] at (c3b-east)
+    {Box={
+        name=conv4,
+        caption= ,
+        fill=\ConvReluColor,
+        height=8,
+        width=1,
+        depth=8
+        }
+    };
+\pic[shift={(0,0,0)}] at (conv4-east)
+    {Box={
+        name=c3c,
+        caption=C3$\times$9,
+        xlabel={{512, }},
+        zlabel=40,
+        fill=\CspColor,
+        height=8,
+        width=4.5,
+        depth=8
+        }
+    };
+\draw [connection]  (c3b-east)    -- node {\midarrow} (conv4-west);
+
+% etapa 5: 20x20x1024 + SPPF (P5)
+\pic[shift={(1.5,0,0)}] at (c3c-east)
+    {Box={
+        name=conv5,
+        caption= ,
+        fill=\ConvReluColor,
+        height=5,
+        width=1,
+        depth=5
+        }
+    };
+\pic[shift={(0,0,0)}] at (conv5-east)
+    {Box={
+        name=c3d,
+        caption=C3$\times$3,
+        xlabel={{1024, }},
+        zlabel=20,
+        fill=\CspColor,
+        height=5,
+        width=5.5,
+        depth=5
+        }
+    };
+\draw [connection]  (c3c-east)    -- node {\midarrow} (conv5-west);
+
+\pic[shift={(1,0,0)}] at (c3d-east)
+    {Box={
+        name=sppf,
+        caption=SPPF,
+        xlabel={{1024, }},
+        zlabel=20,
+        fill=\PoolColor,
+        opacity=0.5,
+        height=5,
+        width=5.5,
+        depth=5
+        }
+    };
+\draw [connection]  (c3d-east)    -- node {\midarrow} (sppf-west);
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick]
+    ($(stem-west)+(-1.5,-6.5)$) -- ($(sppf-east)+(0,-6.5)$)
+    node[midway, below=12pt, font=\Large\bfseries, align=center]
+    {Backbone: CSPDarknet\\[2pt]\normalsize Stem + bloques Conv/2 + C3 (Cross Stage Partial), BN + SiLU};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. Neck: FPN (top-down, upsampling) + PAN (bottom-up, downsampling)
+%    Carriles: P5 en y = 0, P4 en y = 7, P3 en y = 14.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- FPN ---
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(2,0)$)
+    {Box={
+        name=n10,
+        caption=Conv 1$\times$1,
+        xlabel={{512, }},
+        zlabel=20,
+        fill=\ConvReluColor,
+        height=5,
+        width=4,
+        depth=5
+        }
+    };
+\draw [connection]  (sppf-east)    -- node {\midarrow} (n10-west);
+
+\node[concat] (cB) at ($(sppf-east)+(5,7)$) {concat};
+
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(6.5,7)$)
+    {Box={
+        name=n13,
+        caption=C3,
+        xlabel={{512, }},
+        zlabel=40,
+        fill=\CspColor,
+        height=8,
+        width=4.5,
+        depth=8
+        }
+    };
+\pic[shift={(1.2,0,0)}] at (n13-east)
+    {Box={
+        name=n14,
+        caption=Conv 1$\times$1,
+        xlabel={{256, }},
+        zlabel=40,
+        fill=\ConvReluColor,
+        height=8,
+        width=3,
+        depth=8
+        }
+    };
+
+\node[concat] (cC) at ($(sppf-east)+(12,14)$) {concat};
+
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(13.5,14)$)
+    {Box={
+        name=n17,
+        caption=C3,
+        xlabel={{256, }},
+        zlabel=80,
+        fill=\CspColor,
+        height=12,
+        width=3.5,
+        depth=12
+        }
+    };
+
+% --- PAN ---
+\node[concat] (cD) at ($(sppf-east)+(18,7)$) {concat};
+
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(19.5,7)$)
+    {Box={
+        name=n20,
+        caption=C3,
+        xlabel={{512, }},
+        zlabel=40,
+        fill=\CspColor,
+        height=8,
+        width=4.5,
+        depth=8
+        }
+    };
+
+\node[concat] (cE) at ($(sppf-east)+(23.5,0)$) {concat};
+
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(25,0)$)
+    {Box={
+        name=n23,
+        caption=C3,
+        xlabel={{1024, }},
+        zlabel=20,
+        fill=\CspColor,
+        height=5,
+        width=5.5,
+        depth=5
+        }
+    };
+
+% --- conexiones del neck ---
+% taps del backbone (P3, P4) hacia sus carriles
+\draw [headconnection] (c3c-north) |- node[pos=0.25, left, font=\Large\bfseries] {P4} (cB.west);
+\draw [headconnection] (c3b-north) |- node[pos=0.25, left, font=\Large\bfseries] {P3} (cC.west);
+\node[above=2pt, font=\Large\bfseries] at ($(sppf-east)!0.5!(n10-west)$) {P5};
+
+% FPN top-down: P5 -> P4 -> P3 (upsampling x2)
+\draw [headconnection] (n10-east) -| node[pos=0.75, op] {upsample $\times$2} (cB.south);
+\draw [headconnection] (cB.east) -- (n13-west);
+\draw [connection]     (n13-east) -- node {\midarrow} (n14-west);
+\draw [headconnection] (n14-east) -| node[pos=0.75, op] {upsample $\times$2} (cC.south);
+\draw [headconnection] (cC.east) -- (n17-west);
+
+% PAN bottom-up: P3 -> P4 -> P5 (Conv 3x3 stride 2)
+\draw [headconnection] (n17-east) -| node[pos=0.75, op] {Conv 3$\times$3/2} (cD.north);
+\draw [headconnection] (n14-east) -- (cD.west);
+\draw [headconnection] (cD.east) -- (n20-west);
+\draw [headconnection] (n20-east) -| node[pos=0.75, op] {Conv 3$\times$3/2} (cE.north);
+\draw [headconnection] (n10-east) -- (cE.west);
+\draw [headconnection] (cE.east) -- (n23-west);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. Head: una Conv 1x1 por escala -> 3 anchors x (4 + 1 + 80) = 255 canales
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(30,14)$)
+    {Box={
+        name=h3,
+        caption=Detect,
+        xlabel={{255, }},
+        zlabel=80,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=12,
+        width=2.5,
+        depth=12
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(30,7)$)
+    {Box={
+        name=h4,
+        caption=Detect,
+        xlabel={{255, }},
+        zlabel=40,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=8,
+        width=2.5,
+        depth=8
+        }
+    };
+\pic[shift={(0,0,0)}] at ($(sppf-east)+(30,0)$)
+    {Box={
+        name=h5,
+        caption=Detect,
+        xlabel={{255, }},
+        zlabel=20,
+        fill=\SoftmaxColor,
+        opacity=0.8,
+        height=5,
+        width=2.5,
+        depth=5
+        }
+    };
+
+\draw [headconnection] (n17-east) -- (h3-west);
+\draw [headconnection] (n20-east) -- (h4-west);
+\draw [headconnection] (n23-east) -- (h5-west);
+
+\node[anchor=west, align=left, font=\large] at ($(h3-east)+(1.5,0)$)
+    {\textbf{P3:} $H/8 \times W/8$\\ 80$\times$80, objetos peque\~nos};
+\node[anchor=west, align=left, font=\large] at ($(h4-east)+(1.5,0)$)
+    {\textbf{P4:} $H/16 \times W/16$\\ 40$\times$40, objetos medianos};
+\node[anchor=west, align=left, font=\large] at ($(h5-east)+(1.5,0)$)
+    {\textbf{P5:} $H/32 \times W/32$\\ 20$\times$20, objetos grandes};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Regiones de fondo: Neck (FPN + PAN) y Head
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{scope}[on background layer]
+    \fill[blue!4, rounded corners=8pt]   ($(sppf-east)+(1.2,-3.5)$) rectangle ($(sppf-east)+(16.2,18)$);
+    \fill[green!5, rounded corners=8pt]  ($(sppf-east)+(16.8,-3.5)$) rectangle ($(sppf-east)+(28.6,18)$);
+    \fill[violet!5, rounded corners=8pt] ($(sppf-east)+(29.2,-3.5)$) rectangle ($(sppf-east)+(40.2,18)$);
+\end{scope}
+
+\node[font=\Large\bfseries, align=center] at ($(sppf-east)+(8.7,19.5)$)
+    {Neck: FPN (top-down)\\[2pt]\normalsize upsampling + concatenaci\'on};
+\node[font=\Large\bfseries, align=center] at ($(sppf-east)+(22.7,19.5)$)
+    {Neck: PAN (bottom-up)\\[2pt]\normalsize downsampling + concatenaci\'on};
+\node[font=\Large\bfseries, align=center] at ($(sppf-east)+(34.7,19.5)$)
+    {Head: 3 escalas\\[2pt]\normalsize Conv 1$\times$1 por escala};
+
+\node[font=\large, align=center] at ($(sppf-east)+(34.7,-5.2)$)
+    {255 = 3 anchors $\times$ $(x, y, w, h, \mathrm{conf}, c_1, \dots, c_{80})$};
+
+\end{tikzpicture}
+\end{document}
