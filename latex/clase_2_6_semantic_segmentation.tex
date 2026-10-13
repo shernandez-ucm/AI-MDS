@@ -1,0 +1,505 @@
+\documentclass[aspectratio=169, 10pt]{beamer}
+
+% ---------- Tema y colores ----------
+\usetheme{default}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{frametitle continuation}{}
+
+\definecolor{StanfordRed}{RGB}{140,21,21}
+\definecolor{LightGray}{RGB}{240,240,240}
+\definecolor{AccentGreen}{RGB}{0,130,100}
+\definecolor{UCMBlue}{RGB}{4, 171, 226}
+\definecolor{UCMNavy}{RGB}{20, 65, 134}
+
+\definecolor{mitblue}{RGB}{20, 65, 134}
+\definecolor{mitgray}{RGB}{169, 169, 169}
+
+\definecolor{AdaptRed}{RGB}{200, 40, 40}
+\definecolor{FixedBlue}{RGB}{20, 65, 134}
+
+\setbeamercolor{frametitle}{fg=white, bg=UCMBlue}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{author}{fg=white}
+\setbeamercolor{institute}{fg=white!80}
+\setbeamercolor{structure}{fg=UCMBlue}
+\setbeamercolor{block title}{bg=UCMBlue!15!white, fg=UCMBlue}
+\setbeamercolor{block body}{bg=LightGray}
+\setbeamercolor{block title alerted}{bg=StanfordRed!15!white, fg=StanfordRed}
+\setbeamercolor{block body alerted}{bg=LightGray}
+\setbeamercolor{alerted text}{fg=UCMBlue}
+
+\setbeamerfont{frametitle}{series=\bfseries, size=\large}
+\setbeamerfont{title}{series=\bfseries, size=\LARGE}
+\setbeamerfont{block title}{series=\bfseries}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[provide=*,spanish]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows, arrows.meta, shapes, shapes.geometric, positioning,
+	fit, calc, matrix, chains, mindmap, decorations.pathreplacing,
+	backgrounds, shadows, patterns}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{fontawesome5}
+
+% ---------- Comandos utiles ----------
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\E}{\mathbb{E}}
+\newcommand{\frozen}{{\color{FixedBlue}\faLock}}
+\newcommand{\tuned}{{\color{AdaptRed}\faFire}}
+\newcommand{\ad}[1]{{\color{AdaptRed}#1}}
+\newcommand{\fx}[1]{{\color{FixedBlue}#1}}
+
+\newcommand{\formula}[1]{%
+	\begin{tcolorbox}[colback=UCMBlue!8, colframe=UCMBlue, arc=4pt,
+		boxsep=2pt, left=6pt, right=6pt, top=3pt, bottom=3pt]
+		#1
+	\end{tcolorbox}
+}
+
+% ---------- Portada ----------
+\title{\textbf{Segmentaci\'on Sem\'antica Profunda}}
+\subtitle{Arquitecturas, funciones objetivo, m\'etricas y aplicaciones en oftalmolog\'ia}
+\author{Sergio Hern\'andez, PhD\\ shernandez@ucm.cl}
+\institute{
+	\begin{tikzpicture}[scale=0.42, every node/.style={transform shape}]
+		\foreach \i/\y in {1/0,2/1,3/2}{\node[circle,draw=white,fill=white!20,minimum size=4mm] (i\i) at (0,\y){};}
+		\foreach \i/\y in {1/-0.5,2/0.5,3/1.5,4/2.5}{\node[circle,draw=white,fill=white!35,minimum size=4mm] (h\i) at (2,\y){};}
+		\foreach \i/\y in {1/0.5,2/1.5}{\node[circle,draw=white,fill=white!50,minimum size=4mm] (o\i) at (4,\y){};}
+		\foreach \a in {1,2,3}\foreach \b in {1,2,3,4}{\draw[white,opacity=0.5] (i\a)--(h\b);}
+		\foreach \a in {1,2,3,4}\foreach \b in {1,2}{\draw[white,opacity=0.5] (h\a)--(o\b);}
+	\end{tikzpicture}
+	\\ \textbf{Mag\'ister en Data Science --- Universidad Cat\'olica del Maule}}
+\date{}
+
+\begin{document}
+% --- Titulo ---
+{
+	\setbeamertemplate{background}{
+		\begin{tikzpicture}[remember picture, overlay]
+			\fill[UCMBlue] (current page.south west) rectangle (current page.north east);
+			\fill[UCMBlue!70!black, opacity=0.5]
+			(current page.south west) -- ++(0,3) -- ++(18,0) -- cycle;
+			\foreach \i in {1,...,40}{
+				\fill[white, opacity=0.04]
+				({random()*17}, {random()*10}) circle ({random()*0.3});
+			}
+		\end{tikzpicture}
+	}
+	\begin{frame}[plain]
+		\vspace{1.2cm}
+		\titlepage
+		\begin{tikzpicture}[remember picture, overlay]
+			\node[white, opacity=0.15, font=\fontsize{80}{80}\selectfont]
+			at (current page.east) [xshift=-2cm] {$\circlearrowright$};
+		\end{tikzpicture}
+	\end{frame}
+}
+
+% =================================================================
+\section{Introducci\'on}
+
+\begin{frame}{Segmentaci\'on Sem\'antica vs.\ Clasificaci\'on}
+
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Clasificaci\'on}
+				\small
+				\begin{itemize}
+					\item Una etiqueta para \textbf{la imagen completa}.
+					\item Respuesta: \textit{que es esto?}
+					\item Salida: clase global, probabilidades.
+				\end{itemize}
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Segmentaci\'on Sem\'antica}
+				\small
+				\begin{itemize}
+					\item Una etiqueta para \textbf{cada pixel}.
+					\item Respuesta: \textit{que es cada parte}.
+					\item Salida: mapa de etiquetas (altura $\times$ ancho).
+				\end{itemize}
+			\end{block}
+		\end{column}
+	\end{columns}
+
+	\vspace{0.4cm}
+
+	\begin{alertblock}{Aplicaci\'on Clave en Medicina}
+		Localizar y cuantificar estructuras anat\'omicas o lesiones: tumores, vasos sangu\'ineos, retina.
+	\end{alertblock}
+
+\end{frame}
+
+\begin{frame}{Flujo B\'asico: Encoder-Decoder}
+
+	La mayor\'ia de arquitecturas modernas siguen este patron:
+
+	\vspace{0.3cm}
+
+	\begin{center}
+		\begin{tikzpicture}[
+				lay/.style={draw, thick, rounded corners, minimum width=1.6cm, minimum height=0.7cm, font=\small, align=center},
+				arr/.style={-Stealth, thick}]
+
+			\node[lay, draw=mitgray, fill=LightGray] (x) at (0,0) {Imagen\\ $H \times W \times 3$};
+			\node[lay, draw=FixedBlue, fill=FixedBlue!10] (e1) at (2.5,0) {Conv\\ $H/2 \times W/2$};
+			\node[lay, draw=FixedBlue, fill=FixedBlue!10] (e2) at (4.8,0) {Conv\\ $H/4 \times W/4$};
+			\node[lay, draw=FixedBlue, fill=FixedBlue!10] (bot) at (7.1,0) {Bottleneck\\ $H/8 \times W/8$};
+			\node[lay, draw=AdaptRed, fill=AdaptRed!10] (d1) at (9.4,0) {Deconv\\ $H/4 \times W/4$};
+			\node[lay, draw=AdaptRed, fill=AdaptRed!10] (d2) at (11.7,0) {Deconv\\ $H/2 \times W/2$};
+			\node[lay, draw=AdaptRed, fill=AdaptRed!10] (out) at (14.0,0) {Salida\\ $H \times W \times K$};
+
+			\draw[arr] (x) -- (e1); \draw[arr] (e1) -- (e2); \draw[arr] (e2) -- (bot);
+			\draw[arr] (bot) -- (d1); \draw[arr] (d1) -- (d2); \draw[arr] (d2) -- (out);
+			\draw[-Stealth, dashed, UCMBlue, very thick] (e2) to[bend right=30] (d1);
+			\draw[-Stealth, dashed, UCMBlue, very thick] (e1) to[bend right=35] (d2);
+
+			\node[font=\scriptsize, anchor=north] at (3.65,-0.8) {Encoder};
+			\node[font=\scriptsize, anchor=north] at (7.1,-0.8) {Cuello};
+			\node[font=\scriptsize, anchor=north] at (10.55,-0.8) {Decoder};
+			\node[font=\scriptsize, UCMBlue, anchor=north] at (5.5,0.5) {skip};
+		\end{tikzpicture}
+	\end{center}
+
+	\vspace{0.3cm}
+
+	\begin{block}{Componentes}
+		\begin{itemize}
+			\item \textbf{Encoder:} extrae caracter\'isticas a multiples escalas.
+			\item \textbf{Bottleneck:} representaci\'on comprimida profunda.
+			\item \textbf{Decoder:} reconstruye la resoluci\'on espacial.
+			\item \textbf{Skip connections:} preservan detalles locales.
+		\end{itemize}
+	\end{block}
+
+\end{frame}
+
+% =================================================================
+\section{Arquitecturas Cl\'asicas}
+
+\begin{frame}{U-Net: Arquitectura Fundamental}
+
+	La arquitectura \textbf{U-Net} (Ronneberger et al., 2015) fue disenada para segmentaci\'on medica.
+
+	\formula{
+		\[
+		\text{Encoder:} \quad H \to H/2 \to H/4 \to \cdots \qquad \text{Decoder:} \quad \cdots \to H/4 \to H/2 \to H
+		\]
+	}
+
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Ventajas}
+				\small
+				\begin{itemize}
+					\item Pocos par\'ametros (muy eficiente).
+					\item Skip connections garantizan detalles.
+					\item Excelente para datos pequenos.
+				\end{itemize}
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Desventajas}
+				\small
+				\begin{itemize}
+					\item Receptive field limitado.
+					\item Sin contexto global expl\'icito.
+					\item Requiere mas datos para escenas complejas.
+				\end{itemize}
+			\end{block}
+		\end{column}
+	\end{columns}
+
+\end{frame}
+
+\begin{frame}{U-Net: Diagrama de la Arquitectura}
+
+	\begin{center}
+		\includegraphics[width=\textwidth, height=0.78\textheight, keepaspectratio]{architectures/unet_architecture}
+	\end{center}
+
+\end{frame}
+
+\begin{frame}{SegNet: Pooling con \'Indices}
+
+	SegNet (Badrinarayanan et al., 2017) almacena solo los \'indices del max-pooling en el encoder y los reutiliza para el unpooling en el decoder.
+
+	\vspace{0.2cm}
+
+	\begin{center}
+		\includegraphics[width=0.92\textwidth, height=0.68\textheight, keepaspectratio]{architectures/segnet_architecture}
+	\end{center}
+
+\end{frame}
+
+\begin{frame}{DeepLab: Contexto Global con Atrous Convolutions}
+
+	\textbf{DeepLab} introduce convoluci\'on atrous (dilatada) para capturar contexto multi-escala:
+
+	\formula{
+		\[
+		y[i] = \sum_{k} x[i + r \cdot k] \cdot w[k], \quad r = \text{tasa de dilataci\'on}
+		\]
+	}
+
+	\begin{center}
+		\begin{tikzpicture}[scale=0.8]
+			\node[draw=mitgray, fill=LightGray, minimum width=3cm, minimum height=0.6cm, font=\small] (img) at (0,2) {Entrada};
+			\node[draw=FixedBlue, fill=FixedBlue!15, minimum width=1.8cm, minimum height=0.8cm, font=\small, align=center] (r1) at (0,0.5) {$r=1$\\ normal};
+			\node[draw=FixedBlue, fill=FixedBlue!15, minimum width=1.8cm, minimum height=0.8cm, font=\small, align=center] (r2) at (2.2,0.5) {$r=2$\\ dilatada};
+			\node[draw=FixedBlue, fill=FixedBlue!15, minimum width=1.8cm, minimum height=0.8cm, font=\small, align=center] (r4) at (4.4,0.5) {$r=4$\\ mas dilatada};
+			\node[draw=AccentGreen, fill=AccentGreen!15, minimum width=3cm, minimum height=0.6cm, font=\small] (out) at (2.2,-1) {ASPP: concatena salidas};
+
+			\draw[-Stealth, thick] (img) -- (r1); \draw[-Stealth, thick] (img) -- (r2); \draw[-Stealth, thick] (img) -- (r4);
+			\draw[-Stealth, thick] (r1) -- (out); \draw[-Stealth, thick] (r2) -- (out); \draw[-Stealth, thick] (r4) -- (out);
+		\end{tikzpicture}
+	\end{center}
+
+	\vspace{0.2cm}
+
+	\begin{alertblock}{Ventaja Clave}
+		Mayor receptive field sin reducir resoluci\'on. Detalles + contexto global.
+	\end{alertblock}
+
+\end{frame}
+
+\begin{frame}{DeepLab: M\'odulo ASPP}
+
+	\begin{center}
+		\includegraphics[width=0.8\textwidth, height=0.78\textheight, keepaspectratio]{architectures/deeplab_aspp}
+	\end{center}
+
+\end{frame}
+
+% =================================================================
+\section{Funciones Objetivo}
+
+\begin{frame}{Dice Loss: Optimizar Solapamiento}
+
+	El \textbf{coeficiente Dice} es una metrica que tambien funciona como perdida:
+
+	\formula{
+		\[
+		\text{Dice}(y, \hat{y}) = \frac{2 |y \cap \hat{y}|}{|y| + |\hat{y}|}, \qquad \mathcal{L}_{\text{Dice}} = 1 - \text{Dice}
+		\]
+	}
+
+	\begin{block}{Ventajas sobre Cross-Entropy}
+		\begin{itemize}
+			\item Directamente optimiza IoU (metrica final).
+			\item Menos sensible a desbalance de clases.
+			\item Enfatiza objetos pequenos.
+		\end{itemize}
+	\end{block}
+
+	\begin{alertblock}{Estrategia Practica}
+		Combina CE + Dice. Agrega boundary loss si los bordes son criticos.
+	\end{alertblock}
+
+\end{frame}
+
+% =================================================================
+\section{Metricas de Evaluacion}
+
+\begin{frame}{Metricas Pixel-Level}
+
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Dice (F1-Score)}
+				\small
+				\[
+				\text{Dice} = \frac{2\text{TP}}{2\text{TP} + \text{FP} + \text{FN}}
+				\]
+				Robusto a desbalance de clases.
+			\end{block}
+
+			\begin{block}{Sensibilidad (Recall)}
+				\small
+				\[
+				\text{Sens} = \frac{\text{TP}}{\text{TP} + \text{FN}}
+				\]
+				Proporci\'on de positivos detectados.
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.5\textwidth}
+			\begin{block}{IoU (Jaccard)}
+				\small
+				\[
+				\text{IoU} = \frac{\text{TP}}{\text{TP} + \text{FP} + \text{FN}}
+				\]
+				Intersecci\'on sobre uni\'on.
+			\end{block}
+
+			\begin{block}{Especificidad}
+				\small
+				\[
+				\text{Spec} = \frac{\text{TN}}{\text{TN} + \text{FP}}
+				\]
+				Tasa de negativos correctos.
+			\end{block}
+		\end{column}
+	\end{columns}
+
+	\vspace{0.2cm}
+
+	\begin{alertblock}{Recomendacion}
+		Reporta \textbf{siempre} Dice e IoU, mas sensibilidad y especificidad.
+	\end{alertblock}
+
+\end{frame}
+
+% =================================================================
+\section{Aplicaciones en Oftalmolog\'ia}
+
+\begin{frame}{Retinopat\'ia Diabetica}
+
+	La \textbf{retinopat\'ia diab\'etica (DR)} es la principal causa de ceguera en adultos desarrollados.
+
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Signos Tempranos}
+				\small
+				\begin{itemize}
+					\item Microaneurismas.
+					\item Hemorragias retinianas.
+					\item Exudados duros (lipidos).
+					\item Edema macular diabetico.
+				\end{itemize}
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Desafio}
+				\small
+				\begin{itemize}
+					\item Lesiones pequenas y dispersas.
+					\item Variabilidad entre pacientes.
+					\item Requiere expertos oftalmologos.
+					\item Screening de poblaciones masivas.
+				\end{itemize}
+			\end{block}
+		\end{column}
+	\end{columns}
+
+	\vspace{0.2cm}
+
+	\begin{alertblock}{Oportunidad}
+		Automatizar screening, cuantificar lesiones, predecir progresion.
+	\end{alertblock}
+
+\end{frame}
+
+\begin{frame}{Segmentacion de Vasos Sanguineos}
+
+	Extraer la \textbf{red vascular retiniana} de imagenes de fundus.
+
+	\vspace{0.2cm}
+
+	\begin{block}{Arquitectura tipica}
+		\small
+		U-Net o SegNet. Entrada: $512 \times 512 \times 3$. Salida: $512 \times 512 \times 1$ (vaso/no-vaso).
+	\end{block}
+
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Desafios}
+				\small
+				\begin{itemize}
+					\item Vasos muy finos (1-2 pixeles).
+					\item Bajo contraste en areas oscuras.
+					\item Precision en bordes.
+				\end{itemize}
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Metricas clave}
+				\small
+				Dice $\geq 0.8$, Sensibilidad $\geq 0.75$.
+			\end{block}
+		\end{column}
+	\end{columns}
+
+\end{frame}
+
+\begin{frame}{Desafios en Oftalmologia}
+
+	\begin{columns}[T]
+		\begin{column}{0.33\textwidth}
+			\begin{block}{Datos Limitados}
+				\small
+				Datasets pequenos, anotacion costosa, imbalance de clases.
+
+				\textbf{Solucion:} Transfer learning, augmentation.
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.33\textwidth}
+			\begin{block}{Calidad de Imagen}
+				\small
+				Ruido, bajo contraste, cataratas, desalineamiento.
+
+				\textbf{Solucion:} Preprocessing (CLAHE).
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.33\textwidth}
+			\begin{block}{Interpretabilidad}
+				\small
+				Clinicos necesitan explicacion del modelo.
+
+				\textbf{Solucion:} Grad-CAM, attention maps.
+			\end{block}
+		\end{column}
+	\end{columns}
+
+\end{frame}
+
+% =================================================================
+\section{Resumen}
+
+\begin{frame}{Conclusiones}
+
+	\begin{itemize}
+		\item \textbf{Segmentacion profunda:} base para diagnostico medico automatizado.
+
+		\vspace{0.25cm}
+
+		\item \textbf{Arquitecturas:} U-Net (datos pequenos), DeepLab (contexto global).
+
+		\vspace{0.25cm}
+
+		\item \textbf{Funciones objetivo:} combinar Dice + Cross-Entropy.
+
+		\vspace{0.25cm}
+
+		\item \textbf{Metricas:} Dice, IoU, sensibilidad, especificidad.
+
+		\vspace{0.25cm}
+
+		\item \textbf{Oftalmologia:} vasos, lesiones, disco/cupula. Cada tarea con matices propios.
+
+		\vspace{0.25cm}
+
+		\item \textbf{Desafios:} datos limitados, variabilidad de camaras, interpretabilidad.
+	\end{itemize}
+
+\end{frame}
+
+\end{document}

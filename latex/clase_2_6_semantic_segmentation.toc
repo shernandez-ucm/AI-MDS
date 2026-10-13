@@ -1,0 +1,7 @@
+\babel@toc {spanish}{}\relax 
+\beamer@sectionintoc {1}{Introducci\'on}{2}{0}{1}
+\beamer@sectionintoc {2}{Arquitecturas Cl\'asicas}{4}{0}{2}
+\beamer@sectionintoc {3}{Funciones Objetivo}{9}{0}{3}
+\beamer@sectionintoc {4}{Metricas de Evaluacion}{10}{0}{4}
+\beamer@sectionintoc {5}{Aplicaciones en Oftalmolog\'ia}{11}{0}{5}
+\beamer@sectionintoc {6}{Resumen}{14}{0}{6}
