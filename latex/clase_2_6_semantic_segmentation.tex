@@ -111,6 +111,12 @@
 \section{Introducci\'on}
 
 \begin{frame}{Segmentaci\'on Sem\'antica vs.\ Clasificaci\'on}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\textwidth, height=0.5\textheight, 
+	keepaspectratio]{figures/semantic_segmentation_vs_classification}
+\end{figure}
+	%\vspace{0.4cm}
 
 	\begin{columns}[T]
 		\begin{column}{0.5\textwidth}
@@ -136,11 +142,8 @@
 		\end{column}
 	\end{columns}
 
-	\vspace{0.4cm}
 
-	\begin{alertblock}{Aplicaci\'on Clave en Medicina}
-		Localizar y cuantificar estructuras anat\'omicas o lesiones: tumores, vasos sangu\'ineos, retina.
-	\end{alertblock}
+
 
 \end{frame}
 
@@ -152,6 +155,7 @@
 
 	\begin{center}
 		\begin{tikzpicture}[
+				scale=0.8, every node/.style={transform shape},
 				lay/.style={draw, thick, rounded corners, minimum width=1.6cm, minimum height=0.7cm, font=\small, align=center},
 				arr/.style={-Stealth, thick}]
 
@@ -227,10 +231,10 @@
 
 \end{frame}
 
-\begin{frame}{U-Net: Diagrama de la Arquitectura}
+\begin{frame}{U-Net (2015): Diagrama de la Arquitectura}
 
 	\begin{center}
-		\includegraphics[width=\textwidth, height=0.78\textheight, keepaspectratio]{architectures/unet_architecture}
+		\includegraphics[width=0.8\textwidth, height=\textheight]{architectures/unet_architecture}
 	\end{center}
 
 \end{frame}
@@ -368,7 +372,11 @@
 \section{Aplicaciones en Oftalmolog\'ia}
 
 \begin{frame}{Retinopat\'ia Diabetica}
-
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\textwidth, height=0.5\textheight, 
+	keepaspectratio]{figures/diabetic_eye}
+\end{figure}
 	La \textbf{retinopat\'ia diab\'etica (DR)} es la principal causa de ceguera en adultos desarrollados.
 
 	\begin{columns}[T]
@@ -378,7 +386,6 @@
 				\begin{itemize}
 					\item Microaneurismas.
 					\item Hemorragias retinianas.
-					\item Exudados duros (lipidos).
 					\item Edema macular diabetico.
 				\end{itemize}
 			\end{block}
@@ -389,7 +396,6 @@
 				\small
 				\begin{itemize}
 					\item Lesiones pequenas y dispersas.
-					\item Variabilidad entre pacientes.
 					\item Requiere expertos oftalmologos.
 					\item Screening de poblaciones masivas.
 				\end{itemize}
@@ -397,11 +403,6 @@
 		\end{column}
 	\end{columns}
 
-	\vspace{0.2cm}
-
-	\begin{alertblock}{Oportunidad}
-		Automatizar screening, cuantificar lesiones, predecir progresion.
-	\end{alertblock}
 
 \end{frame}
 
