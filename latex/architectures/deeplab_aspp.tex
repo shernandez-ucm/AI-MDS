@@ -110,33 +110,7 @@
 
 	\draw[arrow] (output_conv) -- (output);
 
-	% ========== ATROUS CONVOLUTION ILLUSTRATION ==========
-	% Show grid for different dilation rates
-	\begin{scope}[xshift=4.0cm, yshift=-2.0cm]
-		\node[font=\small\bfseries] at (0, 0.5) {Atrous Convolution (3x3 kernel)};
-
-		% r=1 (normal)
-		\foreach \x in {0,1,2}{\foreach \y in {0,1,2}{
-			\fill[FixedBlue!30] (\x*0.3, \y*0.3) circle (0.08);
-			\draw[FixedBlue] (\x*0.3, \y*0.3) circle (0.08);
-		}}
-		\node[font=\tiny] at (0.5, -0.3) {r=1};
-
-		% r=6
-		\foreach \x in {0,1,2}{\foreach \y in {0,1,2}{
-			\fill[FixedBlue!50] (3.0+\x*0.6, \y*0.6) circle (0.08);
-			\draw[FixedBlue] (3.0+\x*0.6, \y*0.6) circle (0.08);
-		}}
-		\node[font=\tiny] at (3.5, -0.3) {r=6};
-
-		% r=12
-		\foreach \x in {0,1,2}{\foreach \y in {0,1,2}{
-			\fill[FixedBlue!70] (6.5+\x*1.0, \y*1.0) circle (0.08);
-			\draw[FixedBlue] (6.5+\x*1.0, \y*1.0) circle (0.08);
-		}}
-		\node[font=\tiny] at (7.0, -0.3) {r=12};
-	\end{scope}
-
+	
 	% ========== LABELS ==========
 	\node[font=\small\bfseries] at (2.0, 5.0) {Backbone};
 	\node[font=\small\bfseries] at (5.0, 7.2) {ASPP Module};
