@@ -70,7 +70,7 @@
 \noindent
 \begin{tabularx}{\textwidth}{@{}p{3.2cm}X@{}}
 \textbf{Modalidad} & Individual.\\
-\textbf{Plazo} & \completar{d\'ia y hora de entrega}.\\
+\textbf{Plazo} & 3/11/26\\
 \textbf{Dedicaci\'on} & Aproximadamente 12 horas de trabajo aut\'onomo, m\'as el tiempo de GPU en Google Colab.\\
 \textbf{Entregables} & Notebook reproducible \texttt{.ipynb} + informe en PDF (m\'aximo 6 p\'aginas).\\
 \textbf{Evaluaci\'on} & R\'ubrica de la secci\'on~\ref{sec:rubrica} (240 puntos, 60\,\% de exigencia).\\
@@ -84,7 +84,7 @@
 % =====================================================================
 \section{Contexto clínico}
 
-La retinopat\'ia diab\'etica (RD) afecta aproximadamente al 22\,\% de las personas con diabetes y es una de las principales causas de ceguera prevenible en adultos en edad laboral (Teo et al., 2021). Su detecci\'on temprana depende de reconocer en una fotograf\'ia de fondo de ojo lesiones peque\~nas y dispersas: microaneurismas, hemorragias y exudados. Un programa de cribado poblacional necesita revisar miles de im\'agenes, y la segmentaci\'on autom\'atica de esas lesiones es la base para graduar la enfermedad y decidir a qui\'en derivar.
+La retinopat\'ia diab\'etica (RD) afecta aproximadamente al 22\,\% de las personas con diabetes y es una de las principales causas de ceguera prevenible en adultos en edad laboral (Teo et al., 2021). Su detecci\'on temprana depende de reconocer en una fotograf\'ia de fondo de ojo lesiones peque\~nas y dispersas: microaneurismas, hemorragias y exudados. Un programa de screening poblacional necesita revisar miles de im\'agenes, y la segmentaci\'on autom\'atica de esas lesiones es la base para graduar la enfermedad y decidir a qui\'en derivar.
 
 En la clase 2.6 vimos dos caminos: entrenar un modelo especializado (U-Net con \emph{transfer learning}) o usar un modelo fundacional que segmenta cualquier objeto a partir de un prompt (SAM). Esta tarea los compara sobre el mismo problema cl\'inico, con el notebook:
 \begin{center}\texttt{labs/2.6.2\_SegmentacionRetinopatiaSAM.ipynb}\end{center}
@@ -150,7 +150,7 @@ SAM ViT-B, 5 clics              & & & & ---\\
 SAM no entrega probabilidades calibradas por pixel, por eso no se le calcula AUPR, que es la m\'etrica oficial del desaf\'io IDRiD. Los prompts de SAM se simulan desde el \emph{ground truth}: son un \textbf{or\'aculo}, no lo que har\'ia un cl\'inico real. Esa asimetr\'ia es parte de lo que debe analizar.
 
 \begin{pregunta}
-\textbf{Pregunta central del caso.} Para un programa de cribado de RD, ¿conviene (a) entrenar un \emph{modelo especializado} peque\~no con pocas im\'agenes anotadas, (b) usar un \emph{modelo fundacional} con prompts de un oftalm\'ologo, o (c) usar el modelo fundacional como \emph{herramienta de anotaci\'on} para entrenar el especializado? Su informe debe defender una respuesta \textbf{con evidencia propia}, no con citas.
+\textbf{Pregunta central del caso.} Para un programa de screening de RD, ¿conviene (a) entrenar un \emph{modelo especializado} peque\~no con pocas im\'agenes anotadas, (b) usar un \emph{modelo fundacional} con prompts de un oftalm\'ologo, o (c) usar el modelo fundacional como \emph{herramienta de anotaci\'on} para entrenar el especializado? Su informe debe defender una respuesta \textbf{con evidencia propia}, no con citas.
 \end{pregunta}
 
 % =====================================================================
@@ -229,7 +229,7 @@ Cada tarea se conecta con una parte de la clase 2.6. Las m\'etricas se reportan 
 \textbf{Sobre el uso de asistentes de IA.} Est\'a permitido y se espera que lo declaren: incluyan un p\'arrafo indicando qu\'e herramienta usaron y para qu\'e. Lo que se eval\'ua es el criterio con que interpretan los resultados, y eso no se delega. Un informe con conclusiones que el propio cuaderno no respalda se penaliza en \emph{An\'alisis de datos y evidencia}, independientemente de qui\'en lo haya escrito.
 
 \begin{aviso}
-\textbf{Ganar en la tabla no es el resultado.} SAM recibe prompts de or\'aculo y el U-Net se entrena con 48 im\'agenes: cualquiera de los dos puede ganar por razones que no sobreviven a una cl\'inica real. Lo que se eval\'ua es que identifiquen \textbf{bajo qu\'e protocolo} gana cada uno y si ese protocolo es realista para un programa de cribado.
+\textbf{Ganar en la tabla no es el resultado.} SAM recibe prompts de or\'aculo y el U-Net se entrena con 48 im\'agenes: cualquiera de los dos puede ganar por razones que no sobreviven a una cl\'inica real. Lo que se eval\'ua es que identifiquen \textbf{bajo qu\'e protocolo} gana cada uno y si ese protocolo es realista para un programa de screening.
 \end{aviso}
 
 % =====================================================================
