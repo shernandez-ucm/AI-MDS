@@ -1,0 +1,338 @@
+% =====================================================================
+%  Estudio de casos --- MDS221 Inteligencia Artificial
+%  Basado en clase_2_6_semantic_segmentation_sam.tex (Segmentación semántica: de U-Net a SAM)
+%  Notebook: labs/2.6.2_SegmentacionRetinopatiaSAM.ipynb
+%  Dataset: Indian Diabetic Retinopathy Image Dataset (IDRiD), Porwal et al. (2018)
+% =====================================================================
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[provide=*,spanish]{babel}
+\usepackage[margin=2.1cm]{geometry}
+\usepackage{amsmath, amssymb, bm}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{titlesec}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage[colorlinks=true, allbordercolors=white]{hyperref}
+
+% ---------- Paleta UCM (la misma de las clases) ----------
+\definecolor{UCMBlue}{RGB}{4, 171, 226}
+\definecolor{UCMNavy}{RGB}{20, 65, 134}
+\definecolor{AccentGreen}{RGB}{0, 130, 100}
+\definecolor{StanfordRed}{RGB}{140, 21, 21}
+\definecolor{StanfordGray}{RGB}{77, 77, 77}
+\definecolor{LightGray}{RGB}{240, 240, 240}
+
+\hypersetup{linkcolor=UCMNavy, urlcolor=UCMNavy, citecolor=UCMNavy}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{UCMNavy}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{UCMBlue!80!black}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.6em}
+
+\setlist[itemize]{leftmargin=1.2em, itemsep=2pt, topsep=3pt}
+\setlist[enumerate]{leftmargin=1.4em, itemsep=2pt, topsep=3pt}
+
+% ---------- Cajas ----------
+\newtcolorbox{pregunta}{colback=UCMBlue!7, colframe=UCMBlue, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+\newtcolorbox{aviso}{colback=StanfordRed!5, colframe=StanfordRed, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+\newtcolorbox{entrega}{colback=AccentGreen!6, colframe=AccentGreen, arc=3pt,
+	left=8pt, right=8pt, top=5pt, bottom=5pt, boxrule=0.9pt}
+
+% Vínculo explícito con la clase
+\newcommand{\enlace}[1]{\par\vspace{2pt}{\footnotesize\color{StanfordGray}%
+	$\hookrightarrow$\  #1}}
+
+% Dato administrativo por completar antes de publicar
+\newcommand{\completar}[1]{\leavevmode{\color{StanfordRed}\textbf{[#1]}}}
+
+\begin{document}
+
+% =====================================================================
+\begin{center}
+{\LARGE\bfseries\color{UCMNavy} Estudio de casos}\\[4pt]
+{\Large\bfseries Segmentaci\'on de lesiones en retinopat\'ia diab\'etica:\\ U-Net frente a Segment Anything}\\[10pt]
+{\normalsize MDS221 --- Inteligencia Artificial \quad$\bullet$\quad Unidad 2}\\[2pt]
+{\normalsize Mag\'ister en Data Science --- Universidad Cat\'olica del Maule}\\[2pt]
+{\small Sergio Hern\'andez, PhD \quad$\bullet$\quad \texttt{shernandez@ucm.cl}}
+\end{center}
+\vspace{0.4em}
+\hrule
+\vspace{1em}
+
+\noindent
+\begin{tabularx}{\textwidth}{@{}p{3.2cm}X@{}}
+\textbf{Modalidad} & Individual.\\
+\textbf{Plazo} & \completar{d\'ia y hora de entrega}.\\
+\textbf{Dedicaci\'on} & Aproximadamente 12 horas de trabajo aut\'onomo, m\'as el tiempo de GPU en Google Colab.\\
+\textbf{Entregables} & Notebook reproducible \texttt{.ipynb} + informe en PDF (m\'aximo 6 p\'aginas).\\
+\textbf{Evaluaci\'on} & R\'ubrica de la secci\'on~\ref{sec:rubrica} (240 puntos, 60\,\% de exigencia).\\
+\end{tabularx}
+
+\vspace{0.8em}
+\begin{pregunta}
+\textbf{El caso en una frase.} Segment Anything (SAM) aprendi\'o de 1{,}1 mil millones de m\'ascaras; IDRiD ofrece \textbf{54 im\'agenes} de entrenamiento y un microaneurisma ocupa \textbf{unos pocos pixeles}. ¿Le gana un U-Net entrenado con tan pocos datos a un modelo fundacional que recibe prompts perfectos? Y si pierde, \textbf{¿cu\'anto cuesta en clics de un oftalm\'ologo cerrar la brecha?}
+\end{pregunta}
+
+% =====================================================================
+\section{Contexto clínico}
+
+La retinopat\'ia diab\'etica (RD) afecta aproximadamente al 22\,\% de las personas con diabetes y es una de las principales causas de ceguera prevenible en adultos en edad laboral (Teo et al., 2021). Su detecci\'on temprana depende de reconocer en una fotograf\'ia de fondo de ojo lesiones peque\~nas y dispersas: microaneurismas, hemorragias y exudados. Un programa de cribado poblacional necesita revisar miles de im\'agenes, y la segmentaci\'on autom\'atica de esas lesiones es la base para graduar la enfermedad y decidir a qui\'en derivar.
+
+En la clase 2.6 vimos dos caminos: entrenar un modelo especializado (U-Net con \emph{transfer learning}) o usar un modelo fundacional que segmenta cualquier objeto a partir de un prompt (SAM). Esta tarea los compara sobre el mismo problema cl\'inico, con el notebook:
+\begin{center}\texttt{labs/2.6.2\_SegmentacionRetinopatiaSAM.ipynb}\end{center}
+
+% =====================================================================
+\section{El conjunto de datos}
+
+\noindent\textbf{Indian Diabetic Retinopathy Image Dataset (IDRiD)} --- parte \emph{A. Segmentation}. Porwal et al.~(2018), \emph{Data} 3(3):25.\\
+{\small\url{https://ieee-dataport.org/open-access/indian-diabetic-retinopathy-image-dataset-idrid}}
+
+\vspace{0.6em}
+\noindent
+81 fotograf\'ias de fondo de ojo de $4288 \times 2848$ pixeles, divididas en 54 de entrenamiento y 27 de prueba, con una m\'ascara binaria por lesi\'on:
+
+\vspace{0.6em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}llcX@{}}
+\toprule
+\textbf{Lesi\'on} & \textbf{C\'odigo} & \textbf{Im\'agenes con m\'ascara} & \textbf{Descripci\'on}\\
+\midrule
+Microaneurismas   & \texttt{MA} & 81 & Dilataciones capilares; el primer signo de RD. Miden pocos pixeles.\\
+Hemorragias       & \texttt{HE} & 80 & Sangrado intrarretiniano: manchas rojas puntiformes o en llama.\\
+Exudados duros    & \texttt{EX} & 81 & Dep\'ositos de l\'ipidos amarillos, de bordes n\'itidos.\\
+Exudados blandos  & \texttt{SE} & 40 & Manchas algodonosas por isquemia; blanquecinas y difusas.\\
+\midrule
+Disco \'optico    & \texttt{OD} & 81 & Estructura anat\'omica, no lesi\'on; \'util como control.\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.6em}
+\noindent
+{\sloppy Si una imagen no tiene m\'ascara para una lesi\'on, esa lesi\'on est\'a ausente. El archivo \mbox{\texttt{A.\ Segmentation.zip}} se descarga desde IEEE Dataport con una cuenta gratuita y se deja en \texttt{data/} o en Google Drive. La lesi\'on se elige en la celda de par\'ametros:\par}
+
+\vspace{0.3em}
+\noindent\colorbox{LightGray}{\parbox{\dimexpr\textwidth-2\fboxsep}{\ttfamily\small
+LESION = 'EX'~~~~~~~~~~~~~\# 'MA', 'HE', 'EX', 'SE' u 'OD'\\
+IMG\_H, IMG\_W = 704, 1056~\# m\'ultiplos de 32\\
+DATA\_ZIP = 'data/A. Segmentation.zip'
+}}
+
+% =====================================================================
+\section{Línea base}
+
+Ejecute el notebook completo con \texttt{LESION = 'EX'} y la configuraci\'on por defecto. Esta tabla, con m\'etricas sobre las 27 im\'agenes de \textbf{prueba}, es la l\'inea base de todo el informe:
+
+\vspace{0.5em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}Xcccc@{}}
+\toprule
+\textbf{M\'etodo} & \textbf{Dice} & \textbf{IoU} & \textbf{Dice por imagen} & \textbf{AUPR}\\
+\midrule
+U-Net ResNet-34, BCE            & & & & \\
+U-Net ResNet-34, Dice + Focal   & & & & \\
+SAM ViT-B, caja                 & & & & ---\\
+SAM ViT-B, 1 clic               & & & & ---\\
+SAM ViT-B, 3 clics              & & & & ---\\
+SAM ViT-B, 5 clics              & & & & ---\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.8em}
+\noindent
+SAM no entrega probabilidades calibradas por pixel, por eso no se le calcula AUPR, que es la m\'etrica oficial del desaf\'io IDRiD. Los prompts de SAM se simulan desde el \emph{ground truth}: son un \textbf{or\'aculo}, no lo que har\'ia un cl\'inico real. Esa asimetr\'ia es parte de lo que debe analizar.
+
+\begin{pregunta}
+\textbf{Pregunta central del caso.} Para un programa de cribado de RD, ¿conviene (a) entrenar un \emph{modelo especializado} peque\~no con pocas im\'agenes anotadas, (b) usar un \emph{modelo fundacional} con prompts de un oftalm\'ologo, o (c) usar el modelo fundacional como \emph{herramienta de anotaci\'on} para entrenar el especializado? Su informe debe defender una respuesta \textbf{con evidencia propia}, no con citas.
+\end{pregunta}
+
+% =====================================================================
+\section{Tareas}
+
+Cada tarea se conecta con una parte de la clase 2.6. Las m\'etricas se reportan siempre en \textbf{prueba}; la validaci\'on (6 im\'agenes de entrenamiento reservadas) solo sirve para elegir umbrales o \'epocas. La comparaci\'on BCE frente a Dice + Focal se reporta con \textbf{al menos 3 semillas} y media $\pm$ desviaci\'on est\'andar; el resto puede usar una semilla, declar\'andolo.
+
+\subsection*{T1 --- Línea base y desbalance}
+\begin{enumerate}
+	\item Complete la tabla de la l\'inea base y adjunte las curvas de entrenamiento (p\'erdida, Dice y AUPR de validaci\'on) de ambos U-Net.
+	\item Reporte la fracci\'on de pixeles de lesi\'on y la exactitud de pixel de un modelo que predice ``fondo'' en todo. Explique por qu\'e esa m\'etrica no sirve aqu\'i.
+	\item Presente una figura cualitativa con al menos dos im\'agenes de prueba, marcando verdaderos positivos, falsos positivos y falsos negativos para el mejor U-Net y el mejor SAM.
+\end{enumerate}
+%\enlace{l\'aminas ``C\'omo medimos una m\'ascara'' y ``Datos p\'ublicos con m\'ascaras por lesi\'on''.}
+
+\subsection*{T2 --- Umbral y AUPR}
+\begin{enumerate}
+	\item Busque en validaci\'on el umbral que maximiza el Dice de cada U-Net (entre 0{,}05 y 0{,}95, paso 0{,}05) y apl\'iquelo en prueba. Reporte el Dice antes y despu\'es.
+	\item Explique por qu\'e el umbral 0{,}5 perjudica al modelo entrenado con BCE, relacionando desbalance, calibraci\'on de las probabilidades y umbral \'optimo.
+	\item ¿Por qu\'e el AUPR no cambia al mover el umbral? ¿Qu\'e m\'etrica usar\'ia para elegir entre los dos U-Net y por qu\'e?
+\end{enumerate}
+%\enlace{l\'aminas ``P\'erdidas por pixel'', ``P\'erdidas por regi\'on'' y ``¿Qu\'e p\'erdida usar?''.}
+
+\subsection*{T3 --- Transfer learning}
+\begin{enumerate}
+	\item Compare tres configuraciones con Dice + Focal: encoder pre-entrenado y ajustado (base), pre-entrenado y congelado (\texttt{freeze\_encoder=True}) y sin pre-entrenar (\texttt{PRETRAINED = False}).
+	\item Reporte para cada una los par\'ametros entrenables, el tiempo por \'epoca y las m\'etricas de prueba.
+	\item Contraste con el laboratorio 2.5: ¿el congelamiento del encoder se comporta igual en clasificaci\'on de mascotas que en segmentaci\'on de fondo de ojo? Proponga una explicaci\'on.
+\end{enumerate}
+%\enlace{l\'aminas ``U-Net: simetr\'ia y conexiones de salto'' y ``Un flujo base para segmentar lesiones''.}
+
+\subsection*{T4 --- Otras lesiones y resolución}
+\begin{enumerate}
+	\item Repita la l\'inea base con \texttt{LESION = 'MA'} y \texttt{LESION = 'SE'}. Ordene las cuatro lesiones por dificultad seg\'un sus resultados.
+	\item Para microaneurismas, compare la resoluci\'on por defecto ($704 \times 1056$) con \texttt{IMG\_H, IMG\_W = 1408, 2112}.
+	\item Cuantifique cu\'antas componentes conexas de MA se pierden al reducir la imagen de $4288 \times 2848$ a la resoluci\'on de trabajo, y discuta el compromiso entre resoluci\'on, memoria de GPU y contexto.
+\end{enumerate}
+%\enlace{l\'aminas ``Desaf\'ios abiertos'' (lesiones diminutas) y ``SAM: codificar una vez, decodificar muchas'' (tokens de $16\times16$).}
+
+\subsection*{T5 --- Comparación con SAM}
+\begin{enumerate}
+	\item Grafique el Dice de SAM contra el n\'umero de clics (1, 3 y 5), con el Dice del mejor U-Net como l\'inea de referencia. ¿Cu\'antos clics necesita SAM para igualarlo?
+	\item Analice al menos dos sesgos del protocolo: los prompts provienen del \emph{ground truth} y solo se marcan las \texttt{MAX\_COMPONENTS} lesiones m\'as grandes. Mida el efecto del segundo variando \texttt{MAX\_COMPONENTS}.
+	\item Estime el costo humano: clics por imagen que necesitar\'ia un oftalm\'ologo para igualar al U-Net, frente al costo de anotar las 54 im\'agenes de entrenamiento.
+\end{enumerate}
+%\enlace{l\'aminas ``Segment Anything'', ``Lo que aporta SAM 2, en cifras'' y ``Tres maneras de usar SAM en el fondo de ojo''.}
+
+\subsection*{T6 --- Preprocesamiento y adaptación al dominio}
+\begin{enumerate}
+	\item Eval\'ue SAM con caja y con 3 clics sobre la imagen original y sobre la imagen con CLAHE. Reporte las cuatro combinaciones.
+	\item Explique el resultado considerando con qu\'e datos fue entrenado SAM y qu\'e hace CLAHE al histograma local.
+	\item \textbf{Opcional (bonificaci\'on):} repita con MedSAM (\texttt{RUN\_MEDSAM = True}) y discuta si el ajuste al dominio m\'edico compensa que su entrenamiento casi no incluya fondo de ojo.
+\end{enumerate}
+%\enlace{l\'amina ``De SAM a MedSAM: cerrar la brecha de dominio''.}
+
+% =====================================================================
+\section{Entregables}
+
+\begin{entrega}
+\begin{enumerate}[leftmargin=1.6em]
+	\item \textbf{Notebook reproducible} (\texttt{.ipynb}), ejecutado y con todas las salidas visibles. Toda cifra del informe debe aparecer en una salida del notebook. Un cuaderno que no corre se eval\'ua como si no se hubiera entregado.
+	\item \textbf{Informe} en PDF, m\'aximo 6 p\'aginas sin contar referencias ni anexos, con esta estructura m\'inima:
+	\begin{itemize}
+		\item M\'etodos: preprocesamiento, arquitectura, p\'erdidas, m\'etricas, protocolo de prompts y todo par\'ametro que haya cambiado respecto del notebook.
+		\item L\'inea base completa (T1).
+		\item Resultados de T2--T6, cada uno con su tabla o figura y su lectura.
+		\item Su respuesta a la pregunta central: (a), (b) o (c) --- \textbf{y por qu\'e descarta las otras dos}.
+		\item Una secci\'on final de \textbf{l\'imites}: qu\'e no logr\'o establecer y qu\'e experimento habr\'ia hecho falta.
+	\end{itemize}
+	\item \textbf{Nombre de archivos:} \texttt{T2.6\_<apellido>\_<nombre>.ipynb} y \texttt{.pdf}.
+\end{enumerate}
+\end{entrega}
+
+\vspace{0.4em}
+\noindent
+\textbf{Sobre el uso de asistentes de IA.} Est\'a permitido y se espera que lo declaren: incluyan un p\'arrafo indicando qu\'e herramienta usaron y para qu\'e. Lo que se eval\'ua es el criterio con que interpretan los resultados, y eso no se delega. Un informe con conclusiones que el propio cuaderno no respalda se penaliza en \emph{An\'alisis de datos y evidencia}, independientemente de qui\'en lo haya escrito.
+
+\begin{aviso}
+\textbf{Ganar en la tabla no es el resultado.} SAM recibe prompts de or\'aculo y el U-Net se entrena con 48 im\'agenes: cualquiera de los dos puede ganar por razones que no sobreviven a una cl\'inica real. Lo que se eval\'ua es que identifiquen \textbf{bajo qu\'e protocolo} gana cada uno y si ese protocolo es realista para un programa de cribado.
+\end{aviso}
+
+% =====================================================================
+\section{Rúbrica de evaluación}
+\label{sec:rubrica}
+
+\noindent
+Seis criterios, cuatro niveles. Puntaje m\'aximo \textbf{240 puntos}. La tarea opcional de MedSAM suma hasta 10 puntos de bonificaci\'on, con tope en 240.
+
+\vspace{0.6em}
+\footnotesize
+\noindent
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.35cm} *{4}{>{\raggedright\arraybackslash}X}@{}}
+\toprule
+\textbf{Aspecto} & \textbf{Excelente (40)} & \textbf{Bueno (30)} & \textbf{Aceptable (20)} & \textbf{Bajo (10)}\\
+\midrule
+
+\textbf{Reproducción y rigor experimental}
+& El cuaderno corre completo; l\'inea base completa en prueba; umbrales elegidos en validaci\'on; semillas m\'ultiples donde se piden; cambios de par\'ametros declarados.
+& L\'inea base completa con protocolo correcto; la repetici\'on con semillas o la declaraci\'on de cambios es parcial.
+& Resultados con protocolo discutible: umbral elegido en prueba, m\'etricas de validaci\'on reportadas como finales o una sola semilla en T1.
+& El cuaderno no corre o las cifras del informe no son verificables.\\
+\addlinespace[3pt]
+
+\textbf{Umbral, métricas y desbalance (T1--T2)}
+& Explica con evidencia la relaci\'on entre desbalance, calibraci\'on, umbral y AUPR; elige la m\'etrica de comparaci\'on con criterio.
+& Experimento de umbral correcto; explicaci\'on incompleta de por qu\'e falla BCE o de por qu\'e el AUPR no depende del umbral.
+& Reporta las m\'etricas sin explicar su comportamiento, o explica sin experimento.
+& Usa exactitud de pixel como evidencia o interpreta las m\'etricas de forma err\'onea.\\
+\addlinespace[3pt]
+
+\textbf{Transfer learning y resolución (T3--T4)}
+& Tres configuraciones con par\'ametros, tiempo y m\'etricas; tres lesiones evaluadas; cuantifica los MA perdidos y discute el compromiso de resoluci\'on.
+& Experimentos completos con una omisi\'on (tiempo, una lesi\'on o la cuantificaci\'on de MA perdidos).
+& Solo dos configuraciones o una lesi\'on adicional, sin an\'alisis de resoluci\'on.
+& Experimentos ausentes o conclusiones no respaldadas por ellos.\\
+\addlinespace[3pt]
+
+\textbf{Evaluación crítica de SAM (T5--T6)}
+& Curva de Dice contra clics con referencia; mide el efecto de \texttt{MAX\_COMPONENTS}; estima el costo humano; explica el efecto de CLAHE desde el dominio de entrenamiento.
+& Curva y an\'alisis de sesgos correctos, sin experimento sobre \texttt{MAX\_COMPONENTS} o sin estimaci\'on de costo.
+& Reporta cifras de SAM sin discutir la validez de la comparaci\'on con el U-Net.
+& Concluye que un m\'etodo ``es mejor'' sin considerar el or\'aculo, o con conclusiones contrarias a sus propios datos.\\
+\addlinespace[3pt]
+
+\textbf{Análisis de datos y evidencia}
+& Figuras legibles y bien elegidas (curvas, mapas de error, ampliaciones), incertidumbre reportada, cada afirmaci\'on rastreable al cuaderno.
+& An\'alisis s\'olido; las figuras comunican, con mejoras posibles en claridad o en el tratamiento de la incertidumbre.
+& An\'alisis adecuado pero superficial; faltan figuras cualitativas o comparaciones por lesi\'on.
+& An\'alisis inconsistente con las cifras del cuaderno.\\
+\addlinespace[3pt]
+
+\textbf{Comunicación y recomendación clínica}
+& Informe preciso dentro de 6 p\'aginas; responde la pregunta central descartando con evidencia las otras dos opciones y reconoce sus l\'imites.
+& Bien organizado y con recomendaci\'on fundada, con errores menores o l\'imites tratados con poca profundidad.
+& Se entiende, pero la recomendaci\'on es gen\'erica o excede la extensi\'on.
+& Desorganizado, sin recomendaci\'on o con errores graves que impiden la comprensi\'on.\\
+\bottomrule
+\end{tabularx}
+
+\normalsize
+\vspace{1em}
+\noindent\textbf{Conversión a nota} (60\,\% de exigencia, $P$ = puntaje sobre 240):
+\[
+\text{Nota} =
+\begin{cases}
+1{,}0 + 3{,}0\,\dfrac{P}{144} & \text{si } P < 144,\\[8pt]
+4{,}0 + 3{,}0\,\dfrac{P-144}{96} & \text{si } P \geq 144.
+\end{cases}
+\]
+
+\vspace{0.4em}
+\noindent
+\begin{tabularx}{\textwidth}{@{}l *{8}{>{\centering\arraybackslash}X}@{}}
+\toprule
+\textbf{Puntaje} & 48 & 96 & 120 & \textbf{144} & 168 & 192 & 216 & \textbf{240}\\
+\textbf{Nota}    & 2{,}0 & 3{,}0 & 3{,}5 & \textbf{4{,}0} & 4{,}75 & 5{,}5 & 6{,}25 & \textbf{7{,}0}\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.6em}
+\noindent
+\textbf{Descuentos:} \completar{\_\_ d\'ecimas} por d\'ia de atraso.
+
+% =====================================================================
+\section{Referencias}
+
+\begin{itemize}
+	\item Porwal, P., Pachade, S., Kamble, R., Kokare, M., Deshmukh, G., Sahasrabuddhe, V. \& Meriaudeau, F. (2018). \emph{Indian Diabetic Retinopathy Image Dataset (IDRiD): A Database for Diabetic Retinopathy Screening Research}. Data, 3(3), 25.\\ \url{https://doi.org/10.3390/data3030025}
+	\item Teo, Z.\,L. et al. (2021). \emph{Global Prevalence of Diabetic Retinopathy and Projection of Burden through 2045}. Ophthalmology, 128(11), 1580--1591.\\ \url{https://doi.org/10.1016/j.ophtha.2021.04.027}
+	\item Ronneberger, O., Fischer, P. \& Brox, T. (2015). \emph{U-Net: Convolutional Networks for Biomedical Image Segmentation}. MICCAI.
+	\item He, K., Zhang, X., Ren, S. \& Sun, J. (2016). \emph{Deep Residual Learning for Image Recognition}. CVPR.
+	\item Lin, T.-Y., Goyal, P., Girshick, R., He, K. \& Doll\'ar, P. (2017). \emph{Focal Loss for Dense Object Detection}. ICCV.
+	\item Milletari, F., Navab, N. \& Ahmadi, S.-A. (2016). \emph{V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation}. 3DV.
+	\item Kirillov, A. et al. (2023). \emph{Segment Anything}. ICCV.
+	\item Ravi, N. et al. (2025). \emph{SAM 2: Segment Anything in Images and Videos}. ICLR.
+	\item Ma, J., He, Y., Li, F., Han, L., You, C. \& Wang, B. (2024). \emph{Segment Anything in Medical Images}. Nature Communications, 15, 654.\\ \url{https://doi.org/10.1038/s41467-024-44824-z}
+\end{itemize}
+
+\vspace{1em}
+\hrule
+\vspace{0.4em}
+\noindent{\footnotesize\color{StanfordGray}
+Material del curso MDS221, Mag\'ister en Data Science, Universidad Cat\'olica del Maule. El conjunto IDRiD se distribuye a trav\'es de IEEE Dataport; revise sus condiciones de uso antes de redistribuir im\'agenes.}
+
+\end{document}
