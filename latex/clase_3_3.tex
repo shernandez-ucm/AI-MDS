@@ -148,11 +148,13 @@
 					\item Atenci\'on por similitud (Nadaraya--Watson).
 					\item Funciones de puntaje y \emph{masked softmax}.
 					\item Atenci\'on de Bahdanau.
+					\item Auto-atenci\'on: simple, con pesos entrenables y causal.
 					\item Atenci\'on multi-cabeza.
-					\item Auto-atenci\'on y codificaci\'on posicional.
+					\item Codificaci\'on posicional.
 					\item El Transformer.
 					\item Vision Transformer.
-					\item Preentrenamiento a gran escala: BERT, T5, GPT.
+					\item Preentrenamiento: BERT, T5, GPT.
+					\item Laboratorio 3.3.
 				\end{enumerate}
 			\end{block}
 		\end{column}
@@ -541,79 +543,93 @@ def attention(Q, K, V, valid_lens=None):
 \end{frame}
 
 % =================================================================
-\section{Atenci\'on Multi-Cabeza}
+\section{Auto-Atenci\'on}
 
-\begin{frame}{Atenci\'on Multi-Cabeza}
-	Varias \emph{cabezas} atienden en paralelo a subespacios aprendidos distintos (relaciones sint\'acticas, de largo alcance, etc.).
+\begin{frame}{Auto-Atenci\'on Simple (sin Pesos Entrenables)}
+	Cada token $\mathbf{x}_i$ se reemplaza por un \textbf{vector de contexto} $\mathbf{z}_i$: una mezcla de \emph{todos} los tokens de la misma secuencia.
 	\formula{
+		\small
 		\[
-		\mathbf{h}_i=f\big(\mathbf{W}^{(q)}_i\qv,\ \mathbf{W}^{(k)}_i\kv,\ \mathbf{W}^{(v)}_i\vv\big)\in\R^{p_v},\quad i=1,\dots,h
-		\]
-		\[
-		\mathrm{MHA}(\qv,\kv,\vv)=\mathbf{W}_o\begin{bmatrix}\mathbf{h}_1\\ \vdots\\ \mathbf{h}_h\end{bmatrix}\in\R^{p_o},
-		\qquad \mathbf{W}_o\in\R^{p_o\times h p_v}
+		\omega_{ij}=\mathbf{x}_i^\top\mathbf{x}_j
+		\ \Rightarrow\
+		\alpha_{ij}=\frac{e^{\omega_{ij}}}{\sum_{l}e^{\omega_{il}}}
+		\ \Rightarrow\
+		\mathbf{z}_i=\sum_{j=1}^{n}\alpha_{ij}\mathbf{x}_j
+		\qquad\Longleftrightarrow\qquad
+		\mathbf{Z}=\softmax(\mathbf{X}\mathbf{X}^\top)\,\mathbf{X}
 		\]
 	}
 	\vspace{-0.2cm}
 	\begin{columns}[T]
 		\begin{column}{0.5\textwidth}
 			\small
-			\begin{itemize}
-				\item $f$: atenci\'on de producto punto escalado.
-				\item Para controlar el costo: $p_q=p_k=p_v=p_o/h$.
-				\item As\'i el costo es similar al de una sola cabeza de dimensi\'on completa.
-			\end{itemize}
+			Ejemplo del laboratorio: \emph{Your journey starts with one step}, con embeddings de 3 dimensiones. Consulta: \texttt{journey}.
+			\begin{center}
+				\scriptsize
+				\begin{tabular}{lcccccc}
+					\toprule
+					& Your & journey & starts & with & one & step\\
+					\midrule
+					$\omega_{2j}$ & 0.954 & 1.495 & 1.475 & 0.843 & 0.707 & 1.087\\
+					$\alpha_{2j}$ & 0.139 & 0.238 & 0.233 & 0.124 & 0.108 & 0.158\\
+					\bottomrule
+				\end{tabular}
+			\end{center}
+			$\mathbf{z}_2=(0.442,\ 0.652,\ 0.568)$
 		\end{column}
 		\begin{column}{0.47\textwidth}
-			\begin{center}
-				\begin{tikzpicture}[x=1cm,y=1cm]
-					\node[smallbox] (in) at (0,0) {$\Q,\K,\Vm$};
-					\foreach \i/\y in {1/1.1,2/0.4,3/-0.3}{
-						\node[smallbox, fill=UCMBlue!20] (a\i) at (2.1,\y-0.4) {atenci\'on \i};
-						\draw[arr] (in.east)--(a\i.west);
-					}
-					\node[smallbox, fill=AccentGreen!20] (cat) at (4.2,-0.4) {concat};
-					\node[smallbox] (o) at (5.6,-0.4) {$\mathbf{W}_o$};
-					\foreach \i in {1,2,3}{\draw[arr] (a\i.east)--(cat.west);}
-					\draw[arr] (cat)--(o);
-				\end{tikzpicture}
-			\end{center}
+			\begin{alertblock}{Limitaciones}
+				\small
+				\begin{itemize}
+					\item No hay nada que aprender: la similitud depende solo de los embeddings de entrada.
+					\item Cada token se atiende mucho a s\'i mismo ($\mathbf{x}\cdot\mathbf{x}$ suele ser el mayor producto punto).
+				\end{itemize}
+			\end{alertblock}
+			\small
+			\textbf{Siguiente paso:} proyecciones aprendibles.
 		\end{column}
 	\end{columns}
 \end{frame}
 
-\begin{frame}[fragile]{Multi-Head Attention en PyTorch}
-	\scriptsize
-	\begin{tcolorbox}[colback=LightGray, colframe=UCMNavy, arc=3pt, boxsep=1pt]
+\begin{frame}[fragile]{Auto-Atenci\'on con Pesos Entrenables}
+	Tres proyecciones aprendibles dan los roles de \textbf{consulta}, \textbf{clave} y \textbf{valor} (la formulaci\'on QKV de esta clase):
+	\formula{
+		\small
+		\[
+		\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\quad \mathbf{K}=\mathbf{X}\mathbf{W}_k,\quad \mathbf{V}=\mathbf{X}\mathbf{W}_v,
+		\qquad
+		\mathbf{Z}=\softmax\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right)\mathbf{V}
+		\]
+	}
+	\vspace{-0.1cm}
+	\begin{columns}[T]
+		\begin{column}{0.46\textwidth}
+			\small
+			\begin{itemize}
+				\item $\mathbf{X}\in\R^{n\times d_\text{in}}$, $\ \mathbf{W}_{q,k,v}\in\R^{d_\text{in}\times d_\text{out}}$.
+				\item \texttt{SelfAttention\_v1}: \texttt{nn.Parameter(torch.rand(...))}.
+				\item \texttt{SelfAttention\_v2}: \texttt{nn.Linear}, con sesgo opcional y \textbf{mejor inicializaci\'on}; es la forma est\'andar.
+				\item El factor $1/\sqrt{d_k}$ evita que el softmax se sature.
+			\end{itemize}
+		\end{column}
+		\begin{column}{0.53\textwidth}
+			\scriptsize
+			\begin{tcolorbox}[colback=LightGray, colframe=UCMNavy, arc=3pt, boxsep=1pt]
 \begin{verbatim}
-class MultiHeadAttention(nn.Module):
-    def __init__(self, num_hiddens, num_heads, dropout):
-        super().__init__()
-        self.h = num_heads
-        self.W_q, self.W_k, self.W_v, self.W_o = [nn.Linear(num_hiddens, num_hiddens)
-                                                  for _ in range(4)]
-        self.drop = nn.Dropout(dropout)
+def forward(self, x):          # x: (n, d_in)
+    keys = self.W_key(x)
+    queries = self.W_query(x)
+    values = self.W_value(x)
 
-    def split(self, X):           # (B,T,H) -> (B*h, T, H/h): las cabezas pasan al lote
-        B, T, H = X.shape
-        return X.reshape(B, T, self.h, -1).permute(0, 2, 1, 3).reshape(B*self.h, T, -1)
-
-    def merge(self, X):           # inversa de split
-        X = X.reshape(-1, self.h, X.shape[1], X.shape[2]).permute(0, 2, 1, 3)
-        return X.reshape(X.shape[0], X.shape[1], -1)
-
-    def forward(self, q, k, v, valid_lens=None):
-        q, k, v = self.split(self.W_q(q)), self.split(self.W_k(k)), self.split(self.W_v(v))
-        if valid_lens is not None:
-            valid_lens = valid_lens.repeat_interleave(self.h, dim=0)
-        out, _ = attention(q, k, v, valid_lens)   # atenci\'on escalada de antes
-        return self.W_o(self.merge(self.drop(out)))
+    attn_scores = queries @ keys.T
+    attn_weights = torch.softmax(
+        attn_scores / keys.shape[-1]**0.5, dim=-1)
+    return attn_weights @ values   # (n, d_out)
 \end{verbatim}
-	\end{tcolorbox}
+			\end{tcolorbox}
+		\end{column}
+	\end{columns}
 \end{frame}
-
-% =================================================================
-\section{Auto-Atenci\'on y Posici\'on}
 
 \begin{frame}{Auto-Atenci\'on}
 	Consultas, claves y valores provienen de \textbf{la misma} secuencia $\mathbf{x}_1,\dots,\mathbf{x}_n$:
@@ -649,6 +665,248 @@ class MultiHeadAttention(nn.Module):
 				\bad\ Cuadr\'atico en la longitud $n$ (memoria y tiempo).\\
 				\bad\ \textbf{No tiene noci\'on de orden}.
 			\end{alertblock}
+		\end{column}
+	\end{columns}
+\end{frame}
+
+
+\begin{frame}[fragile]{Atenci\'on Causal: la M\'ascara va \emph{Antes} del Softmax}
+	\formula{
+		\small
+		\[
+		\mathbf{Z}=\softmax\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}+\mathbf{M}\right)\mathbf{V},
+		\qquad
+		M_{ij}=\begin{cases}0 & j\le i\\ -\infty & j>i\end{cases}
+		\]
+	}
+	\vspace{-0.1cm}
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Ingenuo}
+				\small
+				softmax $\to$ multiplicar por la m\'ascara triangular $\to$ \textbf{renormalizar} cada fila.
+			\end{block}
+			\begin{block}{Eficiente (el que usamos)}
+				\small
+				Poner $-\infty$ en el futuro y \emph{luego} softmax: como $e^{-\infty}=0$, las filas ya salen normalizadas, en un solo paso. Ambos dan el mismo resultado.
+			\end{block}
+		\end{column}
+		\begin{column}{0.5\textwidth}
+			\scriptsize
+			\begin{tcolorbox}[colback=LightGray, colframe=UCMNavy, arc=3pt, boxsep=1pt]
+\begin{verbatim}
+mask = torch.triu(torch.ones(T, T), diagonal=1)
+scores = scores.masked_fill(mask.bool(), -torch.inf)
+weights = torch.softmax(scores / d_k**0.5, dim=-1)
+\end{verbatim}
+			\end{tcolorbox}
+			\small
+			\texttt{triu(..., diagonal=1)} marca el tri\'angulo \emph{superior estricto}: las posiciones futuras.
+		\end{column}
+	\end{columns}
+\end{frame}
+
+\begin{frame}{Atenci\'on Causal: la M\'ascara Triangular}
+	Para ser \textbf{autorregresivo} (decodificador, GPT), el token $t$ solo puede mirar los tokens $\le t$.
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{itemize}
+				\item En entrenamiento se procesa toda la secuencia objetivo en paralelo (\emph{teacher forcing}) con una m\'ascara triangular.
+				\item Equivale a usar longitud v\'alida $=t$ para la consulta $t$.
+				\item En predicci\'on se generan tokens uno a uno, reutilizando las representaciones ya calculadas (cach\'e).
+			\end{itemize}
+		\end{column}
+		\begin{column}{0.47\textwidth}
+			\begin{center}
+				\begin{tikzpicture}[x=0.7cm,y=0.7cm]
+					\foreach \r in {0,...,4}{
+						\foreach \c in {0,...,4}{
+							\ifnum\c>\r
+								\fill[mitgray!40] (\c,-\r) rectangle ++(0.9,-0.9);
+							\else
+								\fill[UCMBlue!55] (\c,-\r) rectangle ++(0.9,-0.9);
+							\fi
+						}
+						\node[font=\tiny, anchor=east] at (-0.1,-\r-0.45) {$t=\the\numexpr\r+1\relax$};
+					}
+					\node[font=\tiny] at (2.4,-5.4) {claves $1,\dots,5$};
+					\node[font=\tiny, UCMBlue] at (2.4,-6.0) {azul: permitido \quad gris: enmascarado};
+				\end{tikzpicture}
+			\end{center}
+		\end{column}
+	\end{columns}
+\end{frame}
+
+\begin{frame}{Dropout sobre los Pesos y la Clase \texttt{CausalAttention}}
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Dropout de atenci\'on}
+				\small
+				Despu\'es del softmax, durante el \textbf{entrenamiento}, cada peso se anula con probabilidad $p$ y los restantes se reescalan por $1/(1-p)$. En evaluaci\'on se desactiva.
+			\end{block}
+		\end{column}
+		\begin{column}{0.47\textwidth}
+			\begin{block}{\texttt{CausalAttention} en el lab}
+				\small
+				\begin{itemize}
+					\item Proyecciones \texttt{nn.Linear} $\mathbf{W}_q,\mathbf{W}_k,\mathbf{W}_v$.
+					\item Dimensi\'on de lote: \texttt{queries @ keys.transpose(1, 2)}.
+					\item M\'ascara en \texttt{register\_buffer}: viaja a la GPU con el modelo pero no es un par\'ametro entrenable.
+				\end{itemize}
+			\end{block}
+		\end{column}
+	\end{columns}
+	\begin{center}
+		\small
+		\begin{tikzpicture}[x=1cm,y=1cm]
+			\node[smallbox] (x) at (0,0) {$\mathbf{X}$};
+			\node[smallbox, fill=UCMBlue!20] (qkv) at (1.9,0) {$\mathbf{Q},\mathbf{K},\mathbf{V}$};
+			\node[smallbox, fill=UCMBlue!20] (s) at (4.2,0) {$\mathbf{Q}\mathbf{K}^\top/\sqrt{d_k}$};
+			\node[smallbox, fill=StanfordRed!15, draw=StanfordRed] (m) at (6.4,0) {m\'ascara $-\infty$};
+			\node[smallbox, fill=UCMBlue!20] (sm) at (8.3,0) {softmax};
+			\node[smallbox, fill=mitgray!25] (d) at (9.9,0) {dropout};
+			\node[smallbox, fill=AccentGreen!20] (z) at (11.5,0) {$\cdot\,\mathbf{V}$};
+			\foreach \a/\b in {x/qkv,qkv/s,s/m,m/sm,sm/d,d/z}{\draw[arr] (\a)--(\b);}
+		\end{tikzpicture}
+	\end{center}
+\end{frame}
+
+% =================================================================
+\section{Atenci\'on Multi-Cabeza}
+
+\begin{frame}{Atenci\'on Multi-Cabeza}
+	Varias \emph{cabezas} atienden en paralelo a subespacios aprendidos distintos (relaciones sint\'acticas, de largo alcance, etc.).
+	\formula{
+		\[
+		\mathbf{h}_i=f\big(\mathbf{W}^{(q)}_i\qv,\ \mathbf{W}^{(k)}_i\kv,\ \mathbf{W}^{(v)}_i\vv\big)\in\R^{p_v},\quad i=1,\dots,h
+		\]
+		\[
+		\mathrm{MHA}(\qv,\kv,\vv)=\mathbf{W}_o\begin{bmatrix}\mathbf{h}_1\\ \vdots\\ \mathbf{h}_h\end{bmatrix}\in\R^{p_o},
+		\qquad \mathbf{W}_o\in\R^{p_o\times h p_v}
+		\]
+	}
+	\vspace{-0.2cm}
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\small
+			\begin{itemize}
+				\item $f$: atenci\'on de producto punto escalado.
+				\item Para controlar el costo: $p_q=p_k=p_v=p_o/h$.
+				\item As\'i el costo es similar al de una sola cabeza de dimensi\'on completa.
+					\item En el lab: $p_o=$ \texttt{d\_out}, $p_v=$ \texttt{head\_dim} $=$ \texttt{d\_out}$/h$, $\mathbf{W}_o=$ \texttt{out\_proj}.
+			\end{itemize}
+		\end{column}
+		\begin{column}{0.47\textwidth}
+			\begin{center}
+				\begin{tikzpicture}[x=1cm,y=1cm]
+					\node[smallbox] (in) at (0,0) {$\Q,\K,\Vm$};
+					\foreach \i/\y in {1/1.1,2/0.4,3/-0.3}{
+						\node[smallbox, fill=UCMBlue!20] (a\i) at (2.1,\y-0.4) {atenci\'on \i};
+						\draw[arr] (in.east)--(a\i.west);
+					}
+					\node[smallbox, fill=AccentGreen!20] (cat) at (4.2,-0.4) {concat};
+					\node[smallbox] (o) at (5.6,-0.4) {$\mathbf{W}_o$};
+					\foreach \i in {1,2,3}{\draw[arr] (a\i.east)--(cat.west);}
+					\draw[arr] (cat)--(o);
+				\end{tikzpicture}
+			\end{center}
+		\end{column}
+	\end{columns}
+\end{frame}
+
+
+\begin{frame}{Multi-Cabeza: de la Versi\'on Ingenua a la Eficiente}
+	\begin{columns}[T]
+		\begin{column}{0.48\textwidth}
+			\begin{alertblock}{Ingenua: \texttt{MultiHeadAttentionWrapper}}
+				\small
+				$h$ instancias de \texttt{CausalAttention} en una \texttt{ModuleList}; se recorren con un \textbf{bucle} y se concatenan las salidas.
+				La GPU queda subutilizada y la salida mide $h\cdot$\texttt{d\_out}.
+			\end{alertblock}
+		\end{column}
+		\begin{column}{0.48\textwidth}
+			\begin{block}{Eficiente: \texttt{MultiHeadAttention}}
+				\small
+				\textbf{Una} proyecci\'on grande de tama\~no \texttt{d\_out} y se \emph{divide} en $h$ cabezas con \texttt{view}: todas se calculan en un \'unico producto matricial por lote. \texttt{head\_dim = d\_out // num\_heads}.
+			\end{block}
+		\end{column}
+	\end{columns}
+	\vspace{0.1cm}
+	\begin{center}
+		\small
+		\begin{tikzpicture}[x=1cm,y=1cm]
+			\node[smallbox] (a) at (0,0) {$(b,\,T,\,d_\text{out})$};
+			\node[smallbox, fill=UCMBlue!20] (b) at (4,0) {$(b,\,T,\,h,\,d_h)$};
+			\node[smallbox, fill=UCMBlue!20] (c) at (8,0) {$(b,\,h,\,T,\,d_h)$};
+			\node[smallbox, fill=AccentGreen!20] (d) at (12,0) {$(b,\,h,\,T,\,T)$};
+			\draw[arr] (a)--(b) node[midway,above,font=\tiny]{\texttt{view}};
+			\draw[arr] (b)--(c) node[midway,above,font=\tiny]{\texttt{transpose(1,2)}};
+			\draw[arr] (c)--(d) node[midway,above,font=\tiny]{$\mathbf{Q}\mathbf{K}^\top$ por cabeza};
+		\end{tikzpicture}
+	\end{center}
+	\small
+	Despu\'es: $(\text{pesos}\cdot\mathbf{V})\to(b,h,T,d_h)\xrightarrow{\texttt{transpose}}(b,T,h,d_h)\xrightarrow{\texttt{view}}(b,T,d_\text{out})\to\mathbf{W}_o$.
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{MultiHeadAttention} en PyTorch (versi\'on del laboratorio)}
+	\scriptsize
+	\begin{tcolorbox}[colback=LightGray, colframe=UCMNavy, arc=3pt, boxsep=1pt]
+\begin{verbatim}
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        super().__init__()
+        assert d_out % num_heads == 0
+        self.d_out, self.num_heads = d_out, num_heads
+        self.head_dim = d_out // num_heads
+        self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)   # idem W_key, W_value
+        self.out_proj = nn.Linear(d_out, d_out)                # W_o
+        self.dropout = nn.Dropout(dropout)
+        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), 1))
+
+    def forward(self, x):
+        b, T, _ = x.shape
+        q = self.W_query(x).view(b, T, self.num_heads, self.head_dim).transpose(1, 2)
+        k = ...  # igual con W_key;   v = ...  # igual con W_value   -> (b, heads, T, head_dim)
+
+        scores = q @ k.transpose(2, 3)                         # (b, heads, T, T)
+        scores.masked_fill_(self.mask.bool()[:T, :T], -torch.inf)
+        w = self.dropout(torch.softmax(scores / k.shape[-1]**0.5, dim=-1))
+
+        z = (w @ v).transpose(1, 2).contiguous().view(b, T, self.d_out)
+        return self.out_proj(z)
+\end{verbatim}
+	\end{tcolorbox}
+\end{frame}
+
+% =================================================================
+\section{Codificaci\'on Posicional}
+
+\begin{frame}{La Auto-Atenci\'on No Conoce el Orden}
+	Sin m\'ascara causal, permutar los tokens de entrada solo \textbf{permuta la salida}: sea $\boldsymbol{\Pi}$ una matriz de permutaci\'on,
+	\formula{
+		\small
+		\[
+		\softmax\!\Big(\tfrac{(\boldsymbol\Pi\mathbf{Q})(\boldsymbol\Pi\mathbf{K})^\top}{\sqrt d}\Big)\boldsymbol\Pi\mathbf{V}
+		=\boldsymbol\Pi\,\softmax\!\Big(\tfrac{\mathbf{Q}\mathbf{K}^\top}{\sqrt d}\Big)\boldsymbol\Pi^\top\boldsymbol\Pi\mathbf{V}
+		=\boldsymbol\Pi\,\mathrm{SA}(\mathbf{X})
+		\]
+	}
+	\vspace{-0.2cm}
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{alertblock}{Consecuencia}
+				\small
+				``el perro mordi\'o al hombre'' y ``el hombre mordi\'o al perro'' producen los mismos vectores (reordenados): el modelo \textbf{no distingue} el orden.
+			\end{alertblock}
+		\end{column}
+		\begin{column}{0.47\textwidth}
+			\begin{block}{Soluci\'on}
+				\small
+				Sumar la codificaci\'on posicional: con ella, $\mathrm{SA}(\boldsymbol\Pi\mathbf{X}+\mathbf{P})\neq\boldsymbol\Pi\,\mathrm{SA}(\mathbf{X}+\mathbf{P})$, porque al reordenar cada token recibe la posici\'on de su \emph{nuevo} lugar.
+				\smallskip
+
+				(Ejercicio 3 del laboratorio.)
+			\end{block}
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -693,6 +951,7 @@ class MultiHeadAttention(nn.Module):
 		\end{column}
 	\end{columns}
 \end{frame}
+
 
 % =================================================================
 \section{El Transformer}
@@ -797,37 +1056,6 @@ class MultiHeadAttention(nn.Module):
 					\item Batch norm normaliza sobre el lote; en secuencias de largo variable es inestable, por eso se prefiere layer norm.
 				\end{itemize}
 			\end{block}
-		\end{column}
-	\end{columns}
-\end{frame}
-
-\begin{frame}{Auto-Atenci\'on Enmascarada en el Decodificador}
-	Para ser \textbf{autorregresivo}, el token $t$ solo puede mirar los tokens $\le t$.
-	\begin{columns}[T]
-		\begin{column}{0.5\textwidth}
-			\begin{itemize}
-				\item En entrenamiento se procesa toda la secuencia objetivo en paralelo (\emph{teacher forcing}) con una m\'ascara triangular.
-				\item Equivale a usar longitud v\'alida $=t$ para la consulta $t$.
-				\item En predicci\'on se generan tokens uno a uno, reutilizando las representaciones ya calculadas (cach\'e).
-			\end{itemize}
-		\end{column}
-		\begin{column}{0.47\textwidth}
-			\begin{center}
-				\begin{tikzpicture}[x=0.7cm,y=0.7cm]
-					\foreach \r in {0,...,4}{
-						\foreach \c in {0,...,4}{
-							\ifnum\c>\r
-								\fill[mitgray!40] (\c,-\r) rectangle ++(0.9,-0.9);
-							\else
-								\fill[UCMBlue!55] (\c,-\r) rectangle ++(0.9,-0.9);
-							\fi
-						}
-						\node[font=\tiny, anchor=east] at (-0.1,-\r-0.45) {$t=\the\numexpr\r+1\relax$};
-					}
-					\node[font=\tiny] at (2.4,-5.4) {claves $1,\dots,5$};
-					\node[font=\tiny, UCMBlue] at (2.4,-6.0) {azul: permitido \quad gris: enmascarado};
-				\end{tikzpicture}
-			\end{center}
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -1014,6 +1242,40 @@ class MultiHeadAttention(nn.Module):
 \end{frame}
 
 % =================================================================
+\section{Laboratorio 3.3}
+
+\begin{frame}{Laboratorio 3.3: de las Diapositivas al C\'odigo}
+	\small
+	Cuaderno \texttt{labs/3.3\_AtencionPyTorch.ipynb} (basado en el cap.\ 3 de \emph{Build a Large Language Model From Scratch}, S.\ Raschka).
+	\begin{center}
+		\scriptsize
+		\begin{tabular}{p{4.2cm}p{4.3cm}p{4.2cm}}
+			\toprule
+			\textbf{Secci\'on del lab} & \textbf{Qu\'e se implementa} & \textbf{Diapositivas}\\
+			\midrule
+			1. Auto-atenci\'on simple & $\mathbf{Z}=\softmax(\mathbf{X}\mathbf{X}^\top)\mathbf{X}$ con bucles y en forma matricial & Auto-atenci\'on simple\\
+			2. Pesos entrenables & $\mathbf{W}_q,\mathbf{W}_k,\mathbf{W}_v$; \texttt{SelfAttention\_v1/v2}; experimento de $\sqrt{d_k}$ & Producto punto escalado; auto-atenci\'on con pesos\\
+			3. Atenci\'on causal & m\'ascara $-\infty$, dropout, \texttt{CausalAttention} & M\'ascara antes del softmax; m\'ascara triangular; dropout\\
+			4. Multi-cabeza & \texttt{ModuleList} vs.\ divisi\'on de pesos con \texttt{view} & Ingenua vs.\ eficiente; c\'odigo\\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+\end{frame}
+
+\begin{frame}{Actividad del Laboratorio y D\'onde Repasarla}
+	\begin{enumerate}
+		\item \textbf{Atenci\'on escalada a mano}: implementar $\softmax(\mathbf{Q}\mathbf{K}^\top/\sqrt{d_k})\mathbf{V}$ con m\'ascara opcional y compararla con \texttt{F.scaled\_dot\_product\_attention}. \emph{(Producto punto escalado, m\'ascara causal.)}
+		\item \textbf{Comparar con \texttt{nn.MultiheadAttention}}: copiar sus pesos a nuestra clase y verificar que coinciden. \emph{(Multi-cabeza: $\mathbf{W}_o$ y \texttt{head\_dim}.)}
+		\item \textbf{Equivarianza a permutaciones} y \textbf{codificaci\'on posicional sinusoidal}: mostrar que sin posici\'on el orden no importa y que con ella s\'i. \emph{(La auto-atenci\'on no conoce el orden; codificaci\'on posicional.)}
+		\item \textbf{Mini bloque Transformer}: MHA + FFN con residuales y LayerNorm. \emph{(Bloques del codificador y del decodificador; FFN, Add \& Norm.)}
+	\end{enumerate}
+	\begin{alertblock}{Convenci\'on de m\'ascaras}
+		\small
+		En el lab la m\'ascara booleana vale \texttt{True} donde \textbf{no} se debe atender, y se aplica con \texttt{masked\_fill(..., -torch.inf)}. En la diapositiva de \emph{masked softmax} (d2l) se usan longitudes v\'alidas y un valor $-10^{6}$; es la misma idea.
+	\end{alertblock}
+\end{frame}
+
+% =================================================================
 \section{Conclusiones}
 
 \begin{frame}{Resumen}
@@ -1025,6 +1287,7 @@ class MultiHeadAttention(nn.Module):
 					\item Promedio ponderado de \textbf{valores}, con pesos que salen de la similitud \textbf{consulta--clave} (softmax).
 					\item Producto punto escalado: $\softmax(\Q\K^\top/\sqrt d)\Vm$.
 					\item Atenci\'on aditiva para dimensiones distintas.
+					\item Auto-atenci\'on: $\mathbf{Q},\mathbf{K},\mathbf{V}$ salen de la misma secuencia; m\'ascara causal para modelos autorregresivos.
 					\item Multi-cabeza: varios subespacios en paralelo.
 				\end{itemize}
 			\end{block}
@@ -1044,7 +1307,7 @@ class MultiHeadAttention(nn.Module):
 	\end{columns}
 \end{frame}
 
-\begin{frame}{Ejercicios Sugeridos}
+\begin{frame}{Ejercicios Te\'oricos Sugeridos}
 	\begin{enumerate}
 		\item Demuestre que con $a(\qv,\kv_i)=\qv^\top\kv_i$ y $\kv_i=\vv_i$ se cumple $\nabla_{\qv}\mathrm{Attention}(\qv,\mathcal{D})=\mathrm{Cov}_{p(\kv_i;\qv)}[\kv_i]$.
 		\item Muestre que $\mathrm{Var}(\qv^\top\kv)=d$ si las componentes son independientes con media 0 y varianza 1.
