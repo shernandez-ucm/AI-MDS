@@ -747,7 +747,7 @@ Tokenizador & BPE, 8\,000 \\
 
 \end{frame}
 
-\begin{frame}{Puntuaci\'on Final y Efecto del Tama\~no del Haz}
+\begin{frame}[shrink]{Puntuaci\'on Final y Efecto del Tama\~no del Haz}
 
 	\begin{columns}[T]
 		\begin{column}{0.53\textwidth}
@@ -769,12 +769,17 @@ Tokenizador & BPE, 8\,000 \\
 					\item $k$ mayor: m\'as hip\'otesis, mejor exploraci\'on, m\'as c\'omputo y memoria.
 				\end{itemize}
 			\end{block}
-			\begin{block}{Preguntas}
-				\small
-				\begin{itemize}
-					\item ¿Es la b\'usqueda exhaustiva un caso especial de beam search?
-					\item Aplicar beam search a nuestro traductor (Lab 3.3): ¿c\'omo afecta $k$ a la calidad (BLEU) y a la velocidad?
-				\end{itemize}
+			\begin{block}{Lab 3.3 (200 oraciones de prueba)}
+				\scriptsize
+				\begin{tabular}{@{}lrrrr@{}}
+					\toprule
+					$k$ & 1 & 2 & 4 & 8 \\
+					\midrule
+					BLEU & 0.431 & 0.442 & 0.440 & 0.445 \\
+					Tiempo (s) & 1.1 & 2.7 & 8.0 & 22.3 \\
+					\bottomrule
+				\end{tabular}\\[2pt]
+				El tiempo crece r\'apido con $k$; la mejora de BLEU es peque\~na.
 			\end{block}
 		\end{column}
 	\end{columns}
@@ -820,34 +825,40 @@ Tokenizador & BPE, 8\,000 \\
 
 \end{frame}
 
-\begin{frame}{Ejemplos de Traducci\'on (d2l, modelo GRU, $k=2$)}
+\begin{frame}[shrink]{Ejemplos de Traducci\'on (Lab 3.3, seq2seq con LSTM)}
 
 	\begin{columns}[T]
-		\begin{column}{0.56\textwidth}
-			\begin{block}{Ingl\'es $\to$ franc\'es tras 30 \'epocas}
+		\begin{column}{0.62\textwidth}
+			\begin{block}{Ingl\'es $\to$ franc\'es tras 6 \'epocas}
 				\scriptsize
 				\renewcommand{\arraystretch}{1.2}
-				\begin{tabular}{@{}llll@{}}
+				\begin{tabular}{@{}>{\raggedright}p{2.0cm}>{\raggedright}p{2.9cm}>{\raggedright\arraybackslash}p{2.9cm}@{}}
 					\toprule
-					Entrada & Referencia & Predicci\'on & BLEU \\
+					Entrada & Voraz & Haz ($k=4$) \\
 					\midrule
-					\texttt{go .} & \texttt{va !} & \texttt{va !} & 1.000 \\
-					\texttt{i lost .} & \texttt{j'ai perdu .} & \texttt{j'ai perdu .} & 1.000 \\
-					\texttt{he's calm .} & \texttt{il est calme .} & \texttt{elle court .} & 0.000 \\
-					\texttt{i'm home .} & \texttt{je suis chez moi .} & \texttt{je suis chez moi .} & 1.000 \\
+					\texttt{go .} & \texttt{va te d\'etendre !} & \texttt{continuez.} \\
+					\texttt{i lost .} & \texttt{j'ai perdu la gorge.} & \texttt{j'ai perdu les oreilles.} \\
+					\texttt{he's calm .} & \texttt{il n'en a pas le moral.} & \texttt{il n'a pas l'air.} \\
+					\texttt{i'm home .} & \texttt{je suis \`a la maison.} & \texttt{je suis \`a la maison.} \\
+					\texttt{how are you doing today ?} & \texttt{comment vous faites-vous aujourd'hui ?} & \texttt{comment allez-vous aujourd'hui ?} \\
 					\bottomrule
 				\end{tabular}
 			\end{block}
-			{\scriptsize Los resultados var\'ian entre frameworks y ejecuciones (p.\,ej. la versi\'on MXNet traduce \texttt{he's calm .} como \texttt{il est mouill\'e .}, BLEU 0.658). Son ilustrativos. d2l reporta estos resultados con GRU; no publica una corrida con LSTM (se deja como ejercicio).}
+			{\scriptsize Una sola ejecuci\'on: las traducciones cambian con la semilla y las \'epocas.}
 		\end{column}
 
-		\begin{column}{0.41\textwidth}
+		\begin{column}{0.35\textwidth}
+			\begin{block}{M\'etricas (prueba)}
+				\small
+				P\'erdida $1.420$, perplejidad $4.14$.\\
+				BLEU ($k=2$, 500 pares): voraz $0.446$, haz $k=4$ $0.454$.
+			\end{block}
 			\begin{block}{Observaciones}
 				\small
 				\begin{itemize}
-					\item Frases cortas y frecuentes: traducci\'on perfecta.
-					\item Un error de contenido (\texttt{elle court}) deja BLEU en 0 aunque sea una frase fluida.
-					\item El modelo es un \textbf{modelo de lenguaje} franc\'es: la salida suele ser gramatical aun cuando es incorrecta.
+					\item Frases cortas comunes: bien. Otras: \textbf{fluidas pero incorrectas} (\texttt{j'ai perdu la gorge}).
+					\item El modelo es un \textbf{modelo de lenguaje} franc\'es condicionado en la entrada: genera francés gramatical aun cuando se equivoca.
+					\item La b\'usqueda en haz cambi\'o la salida en 4 de 5 ejemplos.
 				\end{itemize}
 			\end{block}
 		\end{column}
@@ -996,39 +1007,42 @@ return torch.stack(outputs, dim=1)    # (B, T', V)
 
 \end{frame}
 
-\begin{frame}{Resultados con Atenci\'on y Pesos de Atenci\'on}
+\begin{frame}[shrink]{Resultados con Atenci\'on y Pesos de Atenci\'on}
 
 	\begin{columns}[T]
-		\begin{column}{0.55\textwidth}
-			\begin{block}{d2l \S11.4 (GRU + atenci\'on aditiva, 30 \'epocas)}
+		\begin{column}{0.46\textwidth}
+			\centering
+			\includegraphics[width=0.9\linewidth]{figures/seq2seq_attention.pdf}
+
+			{\scriptsize Pesos $\alpha$ al traducir \texttt{i'm home .} $\to$ \texttt{je suis chez moi.} Filas: tokens generados; columnas: tokens de entrada. Cada fila suma 1.}
+			\begin{block}{Qu\'e se observa}
+				\scriptsize
+				\textit{suis} y \textit{chez} atienden casi por completo a \textit{home}; el punto de salida, al punto de entrada. Los pesos son \textbf{no uniformes}.
+			\end{block}
+		\end{column}
+
+		\begin{column}{0.51\textwidth}
+			\begin{block}{Lab 3.3: sin vs.\ con atenci\'on (6 \'epocas)}
 				\scriptsize
 				\renewcommand{\arraystretch}{1.2}
-				\begin{tabular}{@{}llll@{}}
+				\begin{tabular}{@{}lrr@{}}
 					\toprule
-					Entrada & Referencia & Predicci\'on & BLEU \\
+					& seq2seq & + atenci\'on \\
 					\midrule
-					\texttt{go .} & \texttt{va !} & \texttt{va !} & 1.000 \\
-					\texttt{i lost .} & \texttt{j'ai perdu .} & \texttt{j'ai perdu .} & 1.000 \\
-					\texttt{he's calm .} & \texttt{il est calme .} & \texttt{il court .} & 0.000 \\
-					\texttt{i'm home .} & \texttt{je suis chez moi .} & \texttt{je suis chez moi .} & 1.000 \\
+					Par\'ametros & 8.26 M & 8.65 M \\
+					P\'erdida prueba & 1.420 & 1.390 \\
+					Perplejidad & 4.14 & 4.02 \\
+					BLEU voraz & 0.446 & 0.459 \\
+					BLEU haz ($k=4$) & 0.454 & 0.473 \\
+					BLEU oraciones cortas & 0.442 & 0.464 \\
+					BLEU 300 m\'as largas & 0.271 & 0.295 \\
 					\bottomrule
 				\end{tabular}
 			\end{block}
-			{\scriptsize Otras ejecuciones de d2l (otros \emph{frameworks}) dan resultados distintos, incluso con \tok{<unk>}. Cuatro oraciones cortas no bastan para comparar con el modelo sin atenci\'on.}
-		\end{column}
-
-		\begin{column}{0.42\textwidth}
-			\begin{block}{Mapa de calor de pesos}
-				\small
-				Para la \'ultima oraci\'on (\texttt{i'm home .}), d2l grafica $\alpha$: filas = posiciones de la consulta (palabras de salida), columnas = posiciones de la clave (palabras de entrada y \eos).
-				\vspace{0.1cm}
-
-				Cada consulta asigna pesos \textbf{no uniformes}: en cada paso se agregan selectivamente partes distintas de la entrada.
-			\end{block}
-			\begin{block}{Ejercicio}
-				\small
-				Reemplazar la atenci\'on aditiva por producto punto escalado. ¿C\'omo cambia la eficiencia del entrenamiento?
-			\end{block}
+			\begin{alertblock}{Cautela}
+				\scriptsize
+				Un entrenamiento por modelo y pocas \'epocas: las diferencias son peque\~nas y consistentes con la atenci\'on, pero no concluyentes. Reentrena con otras semillas.
+			\end{alertblock}
 		\end{column}
 	\end{columns}
 
