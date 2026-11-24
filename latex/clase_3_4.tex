@@ -165,25 +165,44 @@
 
 \begin{frame}{El Cuello de Botella del Modelo Seq2Seq}
 	\begin{center}
-		\begin{tikzpicture}[x=1cm,y=1cm]
-			% encoder
-			\foreach \i/\w in {1/{the},2/{cat},3/{sat},4/{down}}{
-				\node[smallbox, minimum width=1.2cm] (e\i) at (\i*1.5,0) {RNN};
-				\node[font=\scriptsize] at (\i*1.5,-0.7) {\w};
-				\draw[arr] (\i*1.5,-0.5)--(e\i.south);
-			}
-			\foreach \i/\j in {1/2,2/3,3/4}{\draw[arr] (e\i)--(e\j);}
-			% context
-			\node[box, fill=StanfordRed!20, draw=StanfordRed, minimum width=1.6cm] (c) at (8.3,0) {$\mathbf{c}$\\ \tiny tama\~no fijo};
-			\draw[arr] (e4)--(c);
-			% decoder
-			\foreach \i/\w in {1/{el},2/{gato},3/{se},4/{sent\'o}}{
-				\node[smallbox, minimum width=1.2cm] (d\i) at (8.3+\i*1.5,0) {RNN};
-				\node[font=\scriptsize] at (8.3+\i*1.5,1.0) {\w};
-				\draw[arr] (d\i.north)--(8.3+\i*1.5,0.75);
-			}
-			\draw[arr] (c)--(d1);
-			\foreach \i/\j in {1/2,2/3,3/4}{\draw[arr] (d\i)--(d\j);}
+		\begin{tikzpicture}[x=1cm,y=1cm,scale=0.85,every node/.append style={transform shape}]
+				\tikzset{
+					cont/.style={draw=black, rounded corners=8pt, thick},
+					hid/.style={draw=black, thick, fill=gray!60, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					inp/.style={draw=black, thick, fill=gray!85, text=white, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					outp/.style={draw=black, thick, fill=gray!20, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					lbl/.style={font=\footnotesize},
+					a/.style={-{Stealth[length=1.8mm]}, thick},
+				}
+
+				% codificador
+				\begin{scope}[on background layer]
+					\draw[cont] (0.1,-0.5) rectangle (6.4,1.65);
+				\end{scope}
+				\node[lbl, anchor=south west] at (0.1,1.65) {Codificador};
+				\foreach \i/\w in {1/{the},2/{cat},3/{sat},4/{down}}{
+					\node[inp] (i\i) at (\i*1.4-0.4,0) {\w};
+					\node[hid] (h\i) at (\i*1.4-0.4,1.05) {};
+					\draw[a] (i\i)--(h\i);
+				}
+				\foreach \i/\j in {1/2,2/3,3/4}{\draw[a] (h\i)--(h\j);}
+
+				% decodificador
+				\begin{scope}[on background layer]
+					\draw[cont] (4.5,3.3) rectangle (10.9,5.55);
+				\end{scope}
+				\node[lbl, anchor=south west] at (4.5,5.55) {Decodificador};
+				\foreach \i/\w in {1/{el},2/{gato},3/{se},4/{sent\'o}}{
+					\node[hid] (s\i) at (3.7+\i*1.5,3.75) {};
+					\node[outp] (o\i) at (3.7+\i*1.5,4.85) {\w};
+					\draw[a] (s\i)--(o\i);
+				}
+				\foreach \i/\j in {1/2,2/3,3/4}{\draw[a] (s\i)--(s\j);}
+
+				% vector de contexto único
+				\node[draw=StanfordRed, fill=StanfordRed!15, rounded corners=3pt, thick, font=\scriptsize, minimum height=0.5cm] (c) at (5.2,2.45) {$\mathbf{c}$: tama\~no fijo};
+				\draw[a, StanfordRed] (h4.north) -- (c.south);
+				\draw[a, StanfordRed] (c.north) -- (s1.south);
 		\end{tikzpicture}
 	\end{center}
 	\begin{itemize}
@@ -510,6 +529,58 @@ def attention(Q, K, V, valid_lens=None):
 			\end{center}
 		\end{column}
 	\end{columns}
+\end{frame}
+
+\begin{frame}{Bahdanau: Seq2Seq con Atenci\'on}
+	\begin{center}
+		\begin{tikzpicture}[x=1cm,y=1cm,scale=0.95,every node/.append style={transform shape}]
+				\tikzset{
+					cont/.style={draw=black, rounded corners=8pt, thick},
+					hid/.style={draw=black, thick, fill=gray!60, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					inp/.style={draw=black, thick, fill=gray!85, text=white, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					outp/.style={draw=black, thick, fill=gray!20, rounded corners=3pt, minimum width=1.1cm, minimum height=0.5cm, font=\scriptsize},
+					lbl/.style={font=\footnotesize},
+					a/.style={-{Stealth[length=1.8mm]}, thick},
+				}
+
+				% codificador
+				\begin{scope}[on background layer]
+					\draw[cont] (0.1,-0.5) rectangle (6.4,1.65);
+				\end{scope}
+				\node[lbl, anchor=south west] at (0.1,1.65) {Codificador};
+				\foreach \i/\w in {1/{the},2/{cat},3/{sat},4/{down}}{
+					\node[inp] (i\i) at (\i*1.4-0.4,0) {\w};
+					\node[hid] (h\i) at (\i*1.4-0.4,1.05) {$\mathbf{h}_\i$};
+					\draw[a] (i\i)--(h\i);
+				}
+				\foreach \i/\j in {1/2,2/3,3/4}{\draw[a] (h\i)--(h\j);}
+
+				% decodificador
+				\begin{scope}[on background layer]
+					\draw[cont] (4.5,3.3) rectangle (10.9,5.55);
+				\end{scope}
+				\node[lbl, anchor=south west] at (4.5,5.55) {Decodificador};
+				\foreach \i/\w in {1/{el},2/{gato},3/{se},4/{sent\'o}}{
+					\node[hid] (s\i) at (3.7+\i*1.5,3.75) {$\mathbf{s}_\i$};
+					\node[outp] (o\i) at (3.7+\i*1.5,4.85) {\w};
+					\draw[a] (s\i)--(o\i);
+				}
+				\foreach \i/\j in {1/2,2/3,3/4}{\draw[a] (s\i)--(s\j);}
+
+				\node[hid, fill=StanfordRed!15, draw=StanfordRed] at (s3) {$\mathbf{s}_3$};
+				% contexto dinámico para el paso 3
+				\node[draw=AccentGreen, fill=AccentGreen!20, rounded corners=3pt, thick, font=\scriptsize, minimum height=0.5cm] (c) at (8.2,2.55) {$\mathbf{c}_3=\sum_t\alpha_{3t}\mathbf{h}_t$};
+				\foreach \i/\w in {1/0.1,2/0.6,3/0.2,4/0.1}{
+					\draw[-{Stealth[length=1.5mm]}, StanfordRed, line width={\w*3pt}, opacity=0.8] (h\i.north) -- (c.south west);
+				}
+				\draw[a, AccentGreen] (c.north) -- (s3.south);
+				\draw[a, StanfordRed, dashed] (s2.south) |- (c.west) node[pos=0.25, left, font=\scriptsize, text=StanfordRed] {consulta $\mathbf{s}_2$};
+				\node[font=\scriptsize, StanfordRed, anchor=east] at (4.0,3.0) {pesos $\alpha_{3t}$ (softmax)};
+		\end{tikzpicture}
+	\end{center}
+	\vspace{-2mm}
+	\small
+	Cada $\mathbf{s}_{t'}$ recibe un contexto $\mathbf{c}_{t'}$ distinto, mezcla de \emph{todos} los $\mathbf{h}_t$ ponderada por la relevancia para el paso actual: ya no hay cuello de botella.
 \end{frame}
 
 \begin{frame}{Bahdanau: Arquitectura y Entrenamiento}
